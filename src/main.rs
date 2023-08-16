@@ -3,10 +3,11 @@
 enum TokenValue {
     LeftSqBrkt,
     RightSqBrkt,
-    //Colon,
+    Colon,
+    Dot,
     //Number(f64, String),
     //String(String),
-    //Name(String),
+    Name(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -25,6 +26,14 @@ struct Tokenizer {
     chars: Vec<char>,
     tokens: Vec<Token>,
     done: bool,
+}
+
+fn is_wp(c:char) -> bool {
+    return  c == ' ' || c == '\t' || c == '\n'
+}
+
+fn is_namechar(c:char) -> bool {
+    return !is_wp(c) && c != '.' && c != ':' && c != '[' && c != ']'
 }
 
 impl Tokenizer {
@@ -66,9 +75,7 @@ impl Tokenizer {
         });
     }
     fn eat_wp(&mut self) {
-        fn is_wp(c:char) -> bool {
-            return  c == ' ' || c == '\t' || c == '\n'
-        }
+
         loop {
             if self.eof() || !is_wp(self.cur()) {
                 return
@@ -83,12 +90,43 @@ impl Tokenizer {
                 self.done = true;
                 return;
             }
-            if self.cur() == '[' {
-                self.push_token(TokenValue::LeftSqBrkt);    
-            } else if self.cur() == ']' {
+            let cur = self.cur();
+            if cur == '[' {
+                self.push_token(TokenValue::LeftSqBrkt);
+                self.next();    
+            } else if cur == ']' {
                 self.push_token(TokenValue::RightSqBrkt);
+                self.next();
+            } else if cur == ':' {
+                self.push_token(TokenValue::Colon);
+                self.next();
+            } else if cur == '.' {
+                self.push_token(TokenValue::Dot);
+                self.next();
+            } else if is_namechar(cur) {
+                let mut name: Vec<char> = vec![];
+                let line = self.line;
+                let col = self.col;
+                loop {
+                    if self.eof() {
+                        break
+                    }
+                    let c = self.cur();
+                    if is_namechar(c) {
+                        name.push(c);
+                        self.next();
+                    } else {
+                        break
+                    }
+                }
+                self.tokens.push(Token {
+                    line: line,
+                    col: col,
+                    value: TokenValue::Name(name.iter().collect()),
+                });
+            } else {
+                self.next();
             }
-            self.next();
         }
     }
 }
@@ -151,6 +189,51 @@ mod tests {
                 Token{line:2, col:1, value: TokenValue::RightSqBrkt},
                 Token{line:2, col:2, value: TokenValue::RightSqBrkt},
             ]
+        );
+    }
+
+    #[test]
+    fn test_parse_name() {
+        let mut program = Tokenizer::new(String::from("name"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::Name(String::from("name"))},
+            ],
+        );
+    }
+
+    #[test]
+    fn test_parse_foo_bar() {
+        let mut program = Tokenizer::new(String::from("foo bar"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::Name(String::from("foo"))},
+                Token{line:1, col:5, value: TokenValue::Name(String::from("bar"))},
+            ],
+        );
+    }
+    
+    #[test]
+    fn test_parse_foo_name_punct() {
+        let mut program = Tokenizer::new(String::from("[foo.bar key:[]]"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftSqBrkt},
+                Token{line:1, col:2, value: TokenValue::Name(String::from("foo"))},
+                Token{line:1, col:5, value: TokenValue::Dot},
+                Token{line:1, col:6, value: TokenValue::Name(String::from("bar"))},
+                Token{line:1, col:10, value: TokenValue::Name(String::from("key"))},
+                Token{line:1, col:13, value: TokenValue::Colon},
+                Token{line:1, col:14, value: TokenValue::LeftSqBrkt},
+                Token{line:1, col:15, value: TokenValue::RightSqBrkt},
+                Token{line:1, col:16, value: TokenValue::RightSqBrkt},
+            ],
         );
     }
 }

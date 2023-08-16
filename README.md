@@ -75,3 +75,20 @@ let curl alias 'curl'
 let count 1
 let fakename name.[0]parse --jsonlines curl -GET https://ddm.io/api/fakeidgen/?num=$count
 ```
+
+## Error messages
+
+```
+    Computer says no
+    WRONG!!!
+    ? WHY ?
+    Unknown Error: Failed(0)
+    Segmentation Fault
+    I am a teapot
+    Try Again ? (Y/n)
+    LOL
+    lol, lmao even
+    ok
+    :facepalm:
+    I am sorry Dave, I can't do this 
+``` 
