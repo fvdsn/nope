@@ -6,7 +6,7 @@ enum TokenValue {
     Colon,
     Dot,
     //Number(f64, String),
-    //String(String),
+    String(String),
     Name(String),
 }
 
@@ -67,7 +67,8 @@ impl Tokenizer {
         }
         self.index += 1;
     }
-    fn push_token(&mut self, value:TokenValue) {
+ 
+   fn push_token(&mut self, value:TokenValue) {
         self.tokens.push(Token {
             line: self.line,
             col: self.col,
@@ -103,6 +104,55 @@ impl Tokenizer {
             } else if cur == '.' {
                 self.push_token(TokenValue::Dot);
                 self.next();
+            } else if cur == '-' {
+                let mut str: Vec<char> = vec![];
+                let line = self.line;
+                let col = self.col;
+                loop {
+                    self.next();
+                    if self.eof() || is_wp(self.cur()) {
+                        break;
+                    }
+                    str.push(self.cur());
+                }
+                self.tokens.push(Token {
+                    line: line,
+                    col: col,
+                    value: TokenValue::String(str.iter().collect()),
+                });
+            } else if cur == '"' || cur == '\'' {
+                let mut escape = false;
+                let line = self.line;
+                let col = self.col;
+                let mut str: Vec<char> = vec![];
+                let delim = cur;
+                loop {
+                    self.next();
+                    if self.eof() {
+                        break;
+                    } else if !escape && self.cur() == delim {
+                        self.next();
+                        break;
+                    } else if !escape && self.cur() == '\\' {
+                        escape = true;
+                        continue
+                    } else if escape {
+                        if self.cur() ==  'n' {
+                            str.push('\n');
+                        } else if self.cur() == 't'{
+                            str.push('\t');
+                        } else {
+                            str.push(self.cur());
+                        }
+                    } else {
+                        str.push(self.cur());
+                    }
+                }
+                self.tokens.push(Token {
+                    line: line,
+                    col: col,
+                    value: TokenValue::String(str.iter().collect()),
+                });
             } else if is_namechar(cur) {
                 let mut name: Vec<char> = vec![];
                 let line = self.line;
@@ -233,6 +283,33 @@ mod tests {
                 Token{line:1, col:14, value: TokenValue::LeftSqBrkt},
                 Token{line:1, col:15, value: TokenValue::RightSqBrkt},
                 Token{line:1, col:16, value: TokenValue::RightSqBrkt},
+            ],
+        );
+    }
+    
+    #[test]
+    fn test_parse_string_foo_bar() {
+        let mut program = Tokenizer::new(String::from("-foo -bar-foo"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::String(String::from("foo"))},
+                Token{line:1, col:6, value: TokenValue::String(String::from("bar-foo"))},
+            ],
+        );
+    }
+
+    
+    #[test]
+    fn test_parse_string_quoted() {
+        let mut program = Tokenizer::new(String::from("'foo' \"bar'\""));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::String(String::from("foo"))},
+                Token{line:1, col:7, value: TokenValue::String(String::from("bar'"))},
             ],
         );
     }
