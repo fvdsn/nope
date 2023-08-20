@@ -61,6 +61,20 @@ Any sequence of characters that starts with a `-` and is not a number is also in
 "foo" 'foo' -foo
 ```
 
+### Array and Dictionaries
+
+Arrays and dictionaries are using a single representation. 
+
+```
+let person [name:'Francois' age:32y childrens:['Nicolas' 'Gérladine']]
+```
+
+You can mix and match keyed and indexed values in the same array
+
+```
+let xml [-div id:123 class:'foo bar' "Click on this" [-a href:'#' "link"]]
+```
+
 
 
 
