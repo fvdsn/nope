@@ -40,15 +40,20 @@ add 5kg 2T  # this will print 2005
 
 Boolean logic is pretty straigthforward, `true`, `false`, boolean functions `and a b`, `or a b`, `not a`.
 
+the `ife cond expr1 expr2` expression (if/else) evaluates the first or the second expression depending if the condition is truthy or not
+
 ```
 ife and true not false
     print "yes"
     print "no"
 ```
 
-### Null & Void
+Strings can be either single quoted or double quoted and are multilines by default.
+Any sequence of characters that starts with a `-` and is not a number is also interpreted as a string (without the dash)
 
-
+```
+"foo" 'foo' -foo
+```
 
 
 
