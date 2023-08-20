@@ -1,12 +1,12 @@
 # The Nope Script
 
 > This is project is currently at a very very early stage
-> -[v]: tokenizer
-> -[]: parsing data
-> -[]: parsing expression
-> -[]: executing expression
-> -[]: parsing & executing function declaration
-> -[]: initial stdlib
+> - [v] tokenizer
+> - [ ] parsing data
+> - [ ] parsing expression
+> - [ ] executing expression
+> - [ ] parsing & executing function declaration
+> - [ ] initial stdlib
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
 
