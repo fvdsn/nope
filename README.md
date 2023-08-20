@@ -25,6 +25,8 @@ let add42 |arg| add 42 arg
 print add42 99
 ```
 
+### Numbers
+
 Numbers are just 64bit floats:
 
 ```
@@ -35,8 +37,10 @@ Numbers are just 64bit floats:
 You can add a unit at the end of a number declaration, this will convert its value to the default unit (internal standard). 
 
 ```
-add 5kg 2T  # this will print 2005
+print add 5kg 2T  # this will print 2005
 ```
+
+### Booleans
 
 Boolean logic is pretty straigthforward, `true`, `false`, boolean functions `and a b`, `or a b`, `not a`.
 
@@ -47,6 +51,8 @@ ife and true not false
     print "yes"
     print "no"
 ```
+
+### Strings
 
 Strings can be either single quoted or double quoted and are multilines by default.
 Any sequence of characters that starts with a `-` and is not a number is also interpreted as a string (without the dash)
