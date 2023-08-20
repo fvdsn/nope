@@ -4,11 +4,8 @@
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
 
-## The Goodies
 
-## The Basics
-
-In nope is an expression based language. Every function has a fixed number of arguments and is immediately applied upon referencement
+Nope is an expression based language. Every function has a fixed number of arguments and is immediately applied upon referencement
 
 ```
 print add 2 3 # this will print 5
@@ -19,6 +16,7 @@ You declare variables with `let varname initialvalue expr`
 ```
 let place "World"
 print concat "Hello, " place
+```
 
 Functions have the form `|arg1 arg2 ... argn| expr`
 
