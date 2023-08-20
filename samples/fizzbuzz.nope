@@ -1,0 +1,10 @@
+iter range [0 100] |i|
+    let div3 eq 0 mod i 3
+    let div5 eq 0 mod i 5
+    ife and div3 div5
+        print "FizzBuzz!!"
+    ife div5
+        print "Buzz"
+    ife div3
+        print "Fizz"
+    print i

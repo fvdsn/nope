@@ -1,0 +1,23 @@
+package: [
+    name: "nope"
+    version: "0.1.0"
+    edition: "2021"
+    description: "The nope interpreter"
+    authors: ["Frédéric van der Essen"]
+    license: "MIT OR Apache-2.0"
+    keywords: ["interpreter"]
+    categories: []
+    homepage: "https://github.com/fvdsn/nope"
+    repository: "https://github.com/fvdsn/nope"
+    readme: "README.md"
+]
+
+bin: [[
+    name: "nope"
+    test: true
+    bench: false
+]]
+
+dependencies: [
+    clap: [version:"3.1.6" features:["derive"]]
+]

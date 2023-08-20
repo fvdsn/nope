@@ -1,0 +1,32 @@
+let quicksort |A|
+    let swap |A i j|
+        let Ai [i]A
+        let Aj [j]A
+        do set [j]A Ai
+        do set [i]A Aj
+        _
+
+    let partition |A lo hi|
+        let pivot [hi]A
+        let i decr lo
+        do iter range[lo decr hi] |j|
+            if <= [j]A pivot
+                do increase i
+                do swap A i j
+                _
+        do increase i 
+        do swap A i hi
+        i
+
+    let sort |A lo hi|
+        if and >= lo 0, < lo hi
+            let p partition A lo hi
+            do sort A, lo, decr p
+            do sort A, incr p, hi
+            _
+
+    do sort A, 0, decr len A
+    A
+
+print quicksort [9 2 8 4 3 5 7 1 0 6]
+
