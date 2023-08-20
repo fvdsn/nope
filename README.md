@@ -1,4 +1,60 @@
-# Nope
+# The Nope Programming Language
+
+> This is project is currently at a very very early stage
+
+Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
+
+## The Goodies
+
+## The Basics
+
+In nope is an expression based language. Every function has a fixed number of arguments and is immediately applied upon referencement
+
+```
+print add 2 3 # this will print 5
+```
+
+You declare variables with `let varname initialvalue expr`
+
+```
+let place "World"
+print concat "Hello, " place
+
+Functions have the form `|arg1 arg2 ... argn| expr`
+
+```
+let add42 |arg| add 42 arg
+print add42 99
+```
+
+Numbers are just 64bit floats:
+
+```
+10 -3.1415 1_000_000 NaN Inf
+```
+
+
+You can add a unit at the end of a number declaration, this will convert its value to the default unit (internal standard). 
+
+```
+add 5kg 2T  # this will print 2005
+```
+
+Boolean logic is pretty straigthforward, `true`, `false`, boolean functions `and a b`, `or a b`, `not a`.
+
+```
+ife and true not false
+    print "yes"
+    print "no"
+```
+
+### Null & Void
+
+
+
+
+
+
 
 ## Examples
 
