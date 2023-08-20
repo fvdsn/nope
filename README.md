@@ -135,3 +135,86 @@ or make the program crash with a message with `expect |errmsg value|`
 ```
 let age expect "Please provide your age" get-strict -age person
 ```
+
+if you want to capture an error that comes from a function argument you need to 
+capture the errors of that argument by prefixing it with `!`, otherwise the function
+immediately returns with its first error argument
+
+```
+let log-errors |!err|
+    do if is-error err
+        print err
+    ret err
+
+let print-hello |place|
+    # this body is never executed if place is an error
+    print join '' ["Hello, " place "!"]
+
+log-errors print-hello get-strict 'usa' countries
+```
+
+### Imperative programming
+
+What if you want to do multiple prints in a row ? You can use and chains the  `do |expr1 expr2|` 
+expression. This evaluates both expression and returns the value of the second. You may use end to
+return `void` at the end of the chain
+
+```
+let print-user |user|
+    do print name.user
+    do print email.user
+    do print map |_| '*' password.user
+    end
+```
+
+### Macros 
+
+if you mark an argument of a function with `$` the argument will contain the rest of the line from that argument onwards as a raw source code string, with $values expanded to string interpolations of current variables
+
+```
+let ls |$args| lines stdout.call 'ls' args
+
+iter ['./foo/' './bar'] |dir|
+    print [0]ls -la $dir
+```
+
+You can also use multi lines macros, they are delimited by `[[[` `]]]`
+
+```
+let python |version $source|
+    let py default !version-not-found [version][-v2.0:'/usr/bin/python2' -v3.0:'/usr/bin/python3']
+    let tmp open-temp-file
+    do write tmp source
+    let res call py path.tmp
+    ife neq 0 errno.res
+        ret !stderr.res
+    ret stdout.res
+
+
+let world 'World'
+
+print python -v3.0 print("Hello $world")
+
+print python -v2.0 [[[
+for fizzbuzz in range(51):
+    if fizzbuzz % 3 == 0 and fizzbuzz % 5 == 0:
+        print("fizzbuzz")
+    elif fizzbuzz % 3 == 0:
+        print("fizz")
+    elif fizzbuzz % 5 == 0:
+        print("buzz")
+    else:
+        print(fizzbuzz)
+]]]
+```
+
+### Configuration
+
+Nope's whole configuration is always given as arguments to the nope executable. If this is provided in the first line of the script, it will be taken into account.
+
+```
+#!/usr/bin/nope --version=0.1
+
+print "Hello World!"
+```
+
