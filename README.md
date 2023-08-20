@@ -1,7 +1,7 @@
 # The Nope Script
 
 > This is project is currently at a very very early stage
-> - [v] tokenizer
+> - [x] tokenizer
 > - [ ] parsing data
 > - [ ] parsing expression
 > - [ ] executing expression
