@@ -1,4 +1,4 @@
-# The Nope Programming Language
+# The Nope Script
 
 > This is project is currently at a very very early stage
 
@@ -61,6 +61,12 @@ Any sequence of characters that starts with a `-` and is not a number is also in
 "foo" 'foo' -foo
 ```
 
+Strings that respect well known formats are automatically parsed and the parsed results are available as fields
+
+```
+print ext."/path/to/file.png" # png
+```
+
 ### Array and Dictionaries
 
 Arrays and dictionaries are using a single representation. 
@@ -75,99 +81,57 @@ You can mix and match keyed and indexed values in the same array
 let xml [-div id:123 class:'foo bar' "Click on this" [-a href:'#' "link"]]
 ```
 
+### `null` and `void` / `_`
 
+Nope has null and void as two separate concepts used to signify the lack of value. `null` means the intentional absence of a value. For example a valid field who's value hasn't been set. `void` signifies the logical absence of a value. for example a function that just has side effects but no meaningful value to return. Or access to a key that does not exist in an array.
 
+`void` can also be written as `_`, that keyword can also be used as a function parameter identifier to signify that you are not interested in the parameter value `iter range 0 100 |_| print 'repeat'`
 
+### Accessing data in arrays
 
-## Examples
-
-```
-let name value expression
-
-let a 42
-let b 99
-add a b
-
-let fibo |n|
-    ife leq n 0
-        0
-    ife leq n 1 
-	1
-        add fib sub n 1
-            fib sub n 2
-
-eq 'foo' -foo
-
-let f open -rw './file.txt' 
-map lines read -utf8 f |line|
-    print line
-
-[3.14 true false null void 'string' [] key:'value']
-
-print serialise -xml [-html 
-  [-body 
-     [-a href:'google.com' 'click here']
-  ]
-]
-
-let sort |array cmp:2|
-	try 0 cmp [i]arr [decr i]arr
-	...
-
-let sorted sort dup [3 1 4] @leq
-
-!'error' 
-
-
-let x sin 90deg
-
-wait 1min
-
-
-let obj [x:42] 
-let foo get -x obj
-
-ext.'/home/fred/file.bin' 
-
-let s makestream []
-thread defer close s while ||
-    let result curl -get 'https://google.com?q=dogs'
-    ife result
-	push s result
-    break
-
-thread map s |dog| print dog 
-
-let fakeyear year.birthday.[0]parse -jsonlines stdout.call[-fakeidgen json:true num:42]
-
-let curl $|args|
-    let res call[-curl args]
-    ife stderr.res
-	!stderr.res
-    stdout.res
-
-let alias |name|:$1
-    $|args| let res call[name args] ife stderr.res !stderr.res stdout.res
-
-let curl alias 'curl'
-
-let count 1
-let fakename name.[0]parse --jsonlines curl -GET https://ddm.io/api/fakeidgen/?num=$count
-```
-
-## Error messages
+you can access fields using dot notation and array indexing, however the association goes leftward. Integer keys access array elements, other keys are converted to string and access dictionary values
 
 ```
-    Computer says no
-    WRONG!!!
-    ? WHY ?
-    Unknown Error: Failed(0)
-    Segmentation Fault
-    I am a teapot
-    Try Again ? (Y/n)
-    LOL
-    lol, lmao even
-    ok
-    :facepalm:
-    I am sorry Dave, I can't do this 
-``` 
+let arr = [1 2 3 4 5]
+let first [0]arr
+let last  [-1]arr
+let notfound [100]arr # void
+let l len arr # 5
+
+do iter arr |val| print val
+do set [1]arr 42
+
+let even [|v| is-even v]arr
+let double map |v| mult 2 v arr
+
+let dict [key:'value' key2:[123]]
+
+let a key.dict
+let b ['key'].dict
+let c contains 'key' dict
+let l count dict # 2
+
+do iter keys dict |key val| print join '' ['key:' key ' value:' [key]dict]
+```
+
+### Errors
+
+you can mark a value as an error with `!`
+
+```
+let get-strict |key dict|
+    ife not contains key dict
+        ret !-key-not-found
+    ret [key]dict
+```
+
+you can then provide a default value in case of errors with `try |default value|`
+
+```
+let age try 18 get-strict -age person
+```
+
+or make the program crash with a message with `expect |errmsg value|`
+```
+let age expect "Please provide your age" get-strict -age person
+```
