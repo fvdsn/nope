@@ -1,7 +1,7 @@
 use std::fs;
 use clap::{Arg, Command};
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 enum TokenValue {
     LeftSqBrkt,
     RightSqBrkt,
@@ -10,13 +10,14 @@ enum TokenValue {
     Pipe,
     Bang,
     Comma,
+    Eof,
     Number(f64, Option<String>),
     String(String),
     Name(String),
     Comment(String),
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct Token {
     value: TokenValue,
     line: usize,
@@ -181,6 +182,7 @@ impl Tokenizer {
             let cur = self.nextc();
 
             if cur == '\0' {
+                self.push_token(TokenValue::Eof);
                 self.state = TokenizerState::Done;
                 return;
             } else if is_wp(cur) {
@@ -364,6 +366,94 @@ impl Tokenizer {
     }
 }
 
+#[derive(PartialEq, Debug)]
+enum AstNode {
+    Number(Token, f64),
+    String(Token, String),
+    Boolean(Token, bool),
+    Null(Token),
+    Void(Token),
+}
+
+#[derive(PartialEq, Debug)]
+struct Parser {
+    tokenizer: Tokenizer,
+    ast: Vec<AstNode>,
+    nextindex: usize,
+    index: usize,
+}
+
+impl Parser {
+    fn new(source: String) -> Parser {
+        return Parser{
+            tokenizer: Tokenizer::new(source),
+            ast: vec![],
+            nextindex: 0,
+            index: 0,
+        };
+    }
+
+    fn print(&self) {
+        println!(
+"Parser:
+  index: {index}",
+            index=self.index,
+        );
+        println!("\nAst:");
+        for (i, n) in self.ast.iter().enumerate() {
+            println!("  index:{index} node:{node:?}", index=i, node=n);
+        }
+    }
+
+    // fn parse_expression(&mut self) {
+
+    // }
+    fn parse(&mut self) {
+        println!("tokens: {}", self.tokenizer.tokens.len());
+        self.tokenizer.tokenize();
+        println!("tokens: {}", self.tokenizer.tokens.len());
+        self.index = 0;
+        self.nextindex = 0;
+        loop {
+            if self.nextindex >= self.tokenizer.tokens.len() {
+                break;
+            } else {
+                self.index = self.nextindex;
+                self.nextindex += 1;
+            }
+
+            let token = self.tokenizer.tokens[self.index].clone();
+
+            match token {
+                Token {value: TokenValue::Number(num, ..), ..} => {
+                    self.ast.push(AstNode::Number(token, num));
+                },
+                Token {value: TokenValue::String(ref string, ..), ..} => {
+                    let _string = string.to_owned();
+                    self.ast.push(AstNode::String(token, _string));
+                },
+                Token {value: TokenValue::Name(ref string, ..), ..} => {
+                    if string == "true" {
+                        self.ast.push(AstNode::Boolean(token, true));
+                    } else if string == "false" {
+                        self.ast.push(AstNode::Boolean(token, false));
+                    } else if string == "null" {
+                        self.ast.push(AstNode::Null(token));
+                    } else if string == "void" || string == "_" {
+                        self.ast.push(AstNode::Void(token));
+                    } else {
+                        println!("wrong");
+                    }
+                },
+                _ => {
+                    println!("wrong");
+                }
+            }
+        }
+    }
+}
+
+
 
 fn main() {
 
@@ -383,6 +473,14 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("parse")
+                .long("parse")
+                .short('p')
+                .takes_value(false)
+                .help("Parses and validates the source code")
+                .required(false)
+        )
+        .arg(
             Arg::new("filename")
                 .help("The path to the source code")
                 .index(1)
@@ -394,13 +492,18 @@ fn main() {
     let filename = m.value_of("filename").expect("No file argument provided");
     let source = fs::read_to_string(filename).expect("Could not read file");
 
-    let mut program = Tokenizer::new(String::from(source));
 
     if m.is_present("tokenize") {
-        program.tokenize();
+        let mut tokenizer = Tokenizer::new(String::from(source));
+        tokenizer.tokenize();
+        tokenizer.print();
+    } else if m.is_present("parse") {
+        let mut parser = Parser::new(String::from(source));
+        parser.parse();
+        parser.tokenizer.print();
+        println!("");
+        parser.print();
     }
-
-    program.print();
 }
 
 #[cfg(test)]
@@ -411,7 +514,7 @@ mod tests {
     fn test_parse_empty() {
         let mut program = Tokenizer::new(String::from(""));
         program.tokenize();
-        assert_eq!(program.tokens, vec![]);
+        assert_eq!(program.tokens, vec![Token{line:1, col:1, value: TokenValue::Eof}]);
         assert_eq!(program.state, TokenizerState::Done);
     }
     
@@ -419,7 +522,10 @@ mod tests {
     fn test_parse_lb() {
         let mut program = Tokenizer::new(String::from("["));
         program.tokenize();
-        assert_eq!(program.tokens, vec![Token{line:1, col:1, value: TokenValue::LeftSqBrkt}]);
+        assert_eq!(program.tokens, vec![
+            Token{line:1, col:1, value: TokenValue::LeftSqBrkt},
+            Token{line:1, col:1, value: TokenValue::Eof},
+        ]);
         assert_eq!(program.state, TokenizerState::Done);
     }
 
@@ -427,7 +533,10 @@ mod tests {
     fn test_parse_wp_lb() {
         let mut program = Tokenizer::new(String::from("  ["));
         program.tokenize();
-        assert_eq!(program.tokens, vec![Token{line:1, col:3, value: TokenValue::LeftSqBrkt}]);
+        assert_eq!(program.tokens, vec![
+            Token{line:1, col:3, value: TokenValue::LeftSqBrkt},
+            Token{line:1, col:3, value: TokenValue::Eof},
+        ]);
         assert_eq!(program.state, TokenizerState::Done);
     }
     
@@ -440,6 +549,7 @@ mod tests {
             vec![
                 Token{line:1, col:3, value: TokenValue::LeftSqBrkt},
                 Token{line:1, col:4, value: TokenValue::LeftSqBrkt},
+                Token{line:1, col:4, value: TokenValue::Eof},
             ]
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -456,6 +566,7 @@ mod tests {
                 Token{line:1, col:4, value: TokenValue::LeftSqBrkt},
                 Token{line:2, col:1, value: TokenValue::RightSqBrkt},
                 Token{line:2, col:2, value: TokenValue::RightSqBrkt},
+                Token{line:2, col:4, value: TokenValue::Eof},
             ]
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -469,6 +580,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Name(String::from("name"))},
+                Token{line:1, col:4, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -483,6 +595,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::Name(String::from("foo"))},
                 Token{line:1, col:5, value: TokenValue::Name(String::from("bar"))},
+                Token{line:1, col:7, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -504,6 +617,7 @@ mod tests {
                 Token{line:1, col:14, value: TokenValue::LeftSqBrkt},
                 Token{line:1, col:15, value: TokenValue::RightSqBrkt},
                 Token{line:1, col:16, value: TokenValue::RightSqBrkt},
+                Token{line:1, col:16, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -518,6 +632,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo"))},
                 Token{line:1, col:6, value: TokenValue::String(String::from("bar-foo"))},
+                Token{line:1, col:13, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -533,6 +648,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo"))},
                 Token{line:1, col:7, value: TokenValue::String(String::from("bar'"))},
+                Token{line:1, col:12, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -547,6 +663,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo \t\nbar"))},
                 Token{line:2, col:6, value: TokenValue::String(String::from("foo \t\nbar"))},
+                Token{line:3, col:4, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -560,6 +677,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo \t\nbar"))},
+                Token{line:1, col:13, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -573,6 +691,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo \t\nbar"))},
+                Token{line:1, col:13, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -586,6 +705,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo \\ ' "))},
+                Token{line:1, col:12, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -599,6 +719,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("foo \\ \" "))},
+                Token{line:1, col:12, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -629,6 +750,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(f64::INFINITY, None)},
                 Token{line:1, col:5, value: TokenValue::Number(f64::NEG_INFINITY, None)},
+                Token{line:1, col:8, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -642,6 +764,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(42.0, None)},
+                Token{line:1, col:2, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -655,6 +778,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(3.141592, None)},
+                Token{line:1, col:8, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -668,6 +792,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(-42.0, None)},
+                Token{line:1, col:3, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -681,6 +806,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(-3.141592, None)},
+                Token{line:1, col:9, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -694,6 +820,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(9000000.000123, None)},
+                Token{line:1, col:17, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -723,6 +850,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(123.0, Some("unit".to_owned()))},
+                Token{line:1, col:7, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -737,6 +865,7 @@ mod tests {
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(123.0, Some("unit".to_owned()))},
                 Token{line:1, col:8, value: TokenValue::Number(456.0, Some("kg".to_owned()))},
+                Token{line:1, col:12, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -754,6 +883,7 @@ mod tests {
                 Token{line:1, col:3, value: TokenValue::Number(42.0, None)},
                 Token{line:1, col:6, value: TokenValue::Number(-1.0, None)},
                 Token{line:1, col:9, value: TokenValue::Number(99.234, None)},
+                Token{line:1, col:14, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -767,6 +897,7 @@ mod tests {
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Comment("!/usr/bin/nope --version=1.0".to_owned())},
+                Token{line:1, col:29, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -782,6 +913,7 @@ mod tests {
                 Token{line:1, col:1, value: TokenValue::Name("foo".to_owned())},
                 Token{line:1, col:4, value: TokenValue::Comment("comment".to_owned())},
                 Token{line:2, col:1, value: TokenValue::Name("bar".to_owned())},
+                Token{line:2, col:3, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -802,6 +934,7 @@ mod tests {
                 Token{line:1, col:14, value: TokenValue::Colon},
                 Token{line:1, col:15, value: TokenValue::String("hello".to_owned())},
                 Token{line:1, col:22, value: TokenValue::RightSqBrkt},
+                Token{line:1, col:22, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -819,6 +952,7 @@ mod tests {
                 Token{line:1, col:9, value: TokenValue::String("Height".to_owned())},
                 Token{line:1, col:18, value: TokenValue::String("Weight".to_owned())},
                 Token{line:1, col:26, value: TokenValue::RightSqBrkt},
+                Token{line:1, col:26, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
@@ -846,6 +980,7 @@ mod tests {
                 Token{line:3, col:22, value: TokenValue::String("Weight".to_owned())},
                 Token{line:3, col:30, value: TokenValue::RightSqBrkt},
                 Token{line:4, col:1, value: TokenValue::RightSqBrkt},
+                Token{line:4, col:2, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
