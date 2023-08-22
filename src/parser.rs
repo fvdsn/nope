@@ -267,8 +267,47 @@ impl Parser {
                 let _string = string.to_owned();
                 self.ast.push(AstNode::String(self.index, _string));
             },
-            Token {value: TokenValue::Number(num, ..), ..} => {
-                let _num = num.to_owned();
+            Token {value: TokenValue::Number(num, unit), ..} => {
+                let mut _num = num.to_owned();
+                let _unit = unit.to_owned();
+                match _unit.as_deref() {
+                    None => {},
+                    Some("GT") => {_num *= 1000000000000.0},
+                    Some("MT") => {_num *= 1000000000.0},
+                    Some("kT") => {_num *= 1000000.0},
+                    Some("T") => {_num *= 1000.0},
+                    Some("kg") => {},
+                    Some("g") => {_num *= 0.001},
+                    Some("mg") => {_num *= 0.000001},
+                    Some("ug") => {_num *= 0.000000001},
+                    Some("ng") => {_num *= 0.000000000001},
+                    Some("Ti") => {_num *= 1024.0 * 1024.0 * 1024.0 * 1024.0},
+                    Some("Gi") => {_num *= 1024.0 * 1024.0 * 1024.0},
+                    Some("Mi") => {_num *= 1024.0 * 1024.0},
+                    Some("ki") => {_num *= 1024.0},
+                    Some("d") => {_num *= 60.0 * 60.0 * 24.0},
+                    Some("h") => {_num *= 60.0 * 60.0},
+                    Some("min") => {_num *= 60.0},
+                    Some("s") => {},
+                    Some("ms") => {_num *= 0.001},
+                    Some("us") => {_num *= 0.000001},
+                    Some("ns") => {_num *= 0.000000001},
+                    Some("deg") => {_num *= std::f64::consts::PI / 180.0},
+                    Some("rad") => {},
+                    Some("in") => {_num *= 0.024},
+                    Some("lb") => {_num *= 0.453592},
+                    Some("oz") => {_num *= 0.0283495},
+                    Some("mile") => {_num *= 1609.34},
+                    Some("miles") => {_num *= 1609.34},
+                    Some("ft") => {_num *= 0.3048},
+                    Some("yd") => {_num *= 0.9144},
+                    Some("F") => {_num = (_num - 32.0) * 5.0 / 9.0},
+                    _ => {
+                        let (line, col) = self.cur_line_col();
+                        self.push_error(line, col, "ERROR: unknown unit".to_owned());
+                        return;
+                    }
+                }
                 self.ast.push(AstNode::Number(self.index, _num));
             },
             Token {value: TokenValue::Name(ref string, ..), ..} => {
