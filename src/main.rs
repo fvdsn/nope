@@ -55,8 +55,10 @@ fn main() {
         let mut parser = Parser::new(String::from(source));
         parser.parse();
         parser.tokenizer.print();
-        println!("");
         parser.print();
-        parser.pretty_print_ast();
+    } else {
+        let mut parser = Parser::new(String::from(source));
+        parser.parse();
+        parser.pretty_print();
     }
 }

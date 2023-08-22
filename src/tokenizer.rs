@@ -31,12 +31,12 @@ pub enum TokenizerState{
 
 #[derive(PartialEq, Debug)]
 pub struct Tokenizer {
-    source: String,
+    pub source: String,
     chars: Vec<char>, // source as vector of characters
     nextindex: usize, // next character to look at, must start at 0
     index: usize, // index of current char in chars, only valid after first call to nextc()
-    line: usize, // line of character at 'index', starts at 1
-    col: usize,  // collumn of character at 'index', starts at 1
+    pub line: usize, // line of character at 'index', starts at 1
+    pub col: usize,  // collumn of character at 'index', starts at 1
     pub tokens: Vec<Token>, // resulting tokens
     pub state: TokenizerState,
 }
@@ -91,19 +91,21 @@ impl Tokenizer {
     }
 
     pub fn print(&self) {
+        println!("\nTokens:");
+        for (i,t) in self.tokens.iter().enumerate() {
+            println!(
+                "  index:{index} line:{line} col:{col} value:{val:?}",
+                index=i, line=t.line, col=t.col, val=t.value);
+        }
         println!(
-"Tokenizer:
-  line: {line}
-  col: {col}
-  state: {state:?}",
+"\n  Tokenizer:
+    line: {line}
+    col: {col}
+    state: {state:?}",
             line=self.line,
             col=self.col,
             state=self.state,
         );
-        println!("\nTokens:");
-        for t in self.tokens.iter() {
-            println!("  line:{line} col:{col} value:{val:?}", line=t.line, col=t.col, val=t.value);
-        }
     }
 
     fn nextc(&mut self) -> char {
