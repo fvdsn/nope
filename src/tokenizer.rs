@@ -175,6 +175,20 @@ impl Tokenizer {
     }
 
     pub fn tokenize(&mut self) {
+        self.tokenize_raw();
+        // FIXME there ought to be a better way to do this
+        let mut newtokens: Vec<Token> = vec![];
+        for ref token in self.tokens.iter() {
+            if matches!(token, Token { value: TokenValue::Comment(..), ..}) {
+                continue
+            } else {
+                newtokens.push((*token).to_owned());
+            }
+        }
+        self.tokens = newtokens;
+    }
+
+    fn tokenize_raw(&mut self) {
         loop {
             if self.state != TokenizerState::Wip {
                 return;
@@ -767,7 +781,7 @@ mod tests {
     #[test]
     fn test_parse_comment() {
         let mut program = Tokenizer::new(String::from("#!/usr/bin/nope --version=1.0"));
-        program.tokenize();
+        program.tokenize_raw();
         assert_eq!(
             program.tokens,
             vec![
@@ -781,7 +795,7 @@ mod tests {
     #[test]
     fn test_parse_comment_complex() {
         let mut program = Tokenizer::new(String::from("foo#comment\nbar"));
-        program.tokenize();
+        program.tokenize_raw();
         assert_eq!(
             program.tokens,
             vec![
@@ -789,6 +803,19 @@ mod tests {
                 Token{line:1, col:4, value: TokenValue::Comment("comment".to_owned())},
                 Token{line:2, col:1, value: TokenValue::Name("bar".to_owned())},
                 Token{line:2, col:3, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_comment_removed() {
+        let mut program = Tokenizer::new(String::from("#!/usr/bin/nope --version=1.0"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:29, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
