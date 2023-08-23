@@ -173,6 +173,23 @@ let print-user |user|
     end
 ```
 
+### Parenthesis
+
+It is possible to add parenthesis around an expression. This has no effect on the code except for styling or error reporting when you
+make syntax mistakes. A set of parenthesis without an expression in it is an expression with the value `void`
+
+```
+ife neq a b (
+    print "a is different from b !"
+) (
+    print "a is equal to b"
+)
+
+print( void eq () ) # true
+
+(add 3 4)
+```
+
 ### Macros 
 
 if you mark an argument of a function with `$` the argument will contain the rest of the line from that argument onwards as a raw source code string, with $values expanded to string interpolations of current variables

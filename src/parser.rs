@@ -12,7 +12,9 @@ enum AstNode {
     Boolean(usize, bool),
     Null(usize),
     Void(usize),
-    KeyValue(usize, String, usize), // String is 
+    Error(usize, usize), // second usize is index of value expression
+    KeyValue(usize, String, usize), // String is  the key, last usize index of the value expression
+                                    // node
     Array(usize, Vec<usize>) // vec of indexes to other ast nodes in the ast array
 }
 
@@ -84,6 +86,10 @@ impl Parser {
             },
             AstNode::Void(_) => {
                 println!("{}_", " ".repeat(original_indent));
+            },
+            AstNode::Error(_, expr_index) => {
+                println!("{}!", " ".repeat(original_indent));
+                self._pretty_print_ast(*expr_index, indent + 2, false);
             },
             AstNode::Array(_, values) => {
                 println!("{}[", " ".repeat(original_indent));
@@ -188,6 +194,12 @@ impl Parser {
         let ref token = self.peekt();
         return matches!(token.value, TokenValue::RightSqBrkt);
     }
+
+    fn peek_rightp(&self) -> bool {
+        let ref token = self.peekt();
+        return matches!(token.value, TokenValue::RightP);
+    }
+
     fn peek2_colon(&self) -> bool {
         let ref token = self.peek2t();
         return matches!(token.value, TokenValue::Colon);
@@ -332,6 +344,34 @@ impl Parser {
                 } else {
                     let (line, col) = self.cur_line_col();
                     self.push_error(line, col, "ERROR: referenced variable has not been declared".to_owned());
+                }
+            },
+            Token {value: TokenValue::Bang, ..} => {
+                let bang_index = self.index;
+                self.parse_expression();
+                if self.state != ParserState::Wip {
+                    return;
+                }
+                self.ast.push(AstNode::Error(bang_index, self.ast.len()-1));
+            },
+            Token {value: TokenValue::LeftP, ..} => {
+                let (pline, pcol) = self.cur_line_col();
+                if self.peek_rightp() {
+                    self.ast.push(AstNode::Void(self.index));
+                    self.nextt();
+                    return;
+                }
+                self.parse_expression();
+                if self.state != ParserState::Wip {
+                    return;
+                }
+                if !self.peek_rightp() {
+                    self.push_error(pline, pcol, "unclosed '('".to_owned());
+                    let (line, col) = self.peek_line_col();
+                    self.push_error(line, col, "ERROR: expected closing ')'".to_owned());
+                    return;
+                } else {
+                    self.nextt();
                 }
             },
             Token {value: TokenValue::LeftSqBrkt, ..} => {
@@ -665,6 +705,46 @@ mod tests {
             AstNode::Array(7, vec![1]),
             AstNode::KeyValue(1, "foo".to_owned(), 2),
             AstNode::Array(8, vec![3]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_error() {
+        let mut parser = Parser::new(String::from("!3.1415"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.1415),
+            AstNode::Error(0, 0)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_paren() {
+        let mut parser = Parser::new(String::from("(3.1415)"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.1415),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_paren_unclosed() {
+        let mut parser = Parser::new(String::from("(3.1415"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.1415),
+        ]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+    #[test]
+    fn test_parse_paren_void() {
+        let mut parser = Parser::new(String::from("()"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Void(0),
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }

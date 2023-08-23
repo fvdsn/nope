@@ -2,6 +2,8 @@
 pub enum TokenValue {
     LeftSqBrkt,
     RightSqBrkt,
+    LeftP,
+    RightP,
     Colon,
     Dot,
     Pipe,
@@ -51,16 +53,18 @@ fn is_wp(c:char) -> bool {
 
 fn is_separator(c:char) -> bool {
     return c == '.' || c == ':' || c == '[' || c == ']' || c == '!' 
-        || c == '|' || c == '"' || c == '\'' || c == '#' || c == ',';
+        || c == '|' || c == '"' || c == '\'' || c == '#' || c == ','
+        || c == '(' || c == ')';
 }
 
 fn is_dashstr_separator(c:char) -> bool {
-    return c == ':' || c == '[' || c == ']' || c == ',';
+    return c == ':' || c == '[' || c == ']' || c == ',' || c == '(' || c == ')';
 }
 
 fn is_num_separator(c:char) -> bool {
     return c == ':' || c == '[' || c == ']' || c == '!' || c == '|' 
-        || c == '"' || c == '\'' || c == '-' || c == '#' || c == ',';
+        || c == '"' || c == '\'' || c == '-' || c == '#' || c == ','
+        || c == ')' || c == '(';
 }
 
 fn is_namechar(c:char) -> bool {
@@ -208,6 +212,10 @@ impl Tokenizer {
                 self.push_token(TokenValue::LeftSqBrkt);
             } else if cur == ']' {
                 self.push_token(TokenValue::RightSqBrkt);
+            } else if cur == '(' {
+                self.push_token(TokenValue::LeftP);
+            } else if cur == ')' {
+                self.push_token(TokenValue::RightP);
             } else if cur == ':' {
                 self.push_token(TokenValue::Colon);
             } else if cur == '.' {
@@ -885,6 +893,84 @@ mod tests {
                 Token{line:3, col:30, value: TokenValue::RightSqBrkt},
                 Token{line:4, col:1, value: TokenValue::RightSqBrkt},
                 Token{line:4, col:2, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_basic_paren() {
+        let mut program = Tokenizer::new(String::from("()"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftP},
+                Token{line:1, col:2, value: TokenValue::RightP},
+                Token{line:1, col:2, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_basic_paren_num() {
+        let mut program = Tokenizer::new(String::from("(3.14)"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftP},
+                Token{line:1, col:2, value: TokenValue::Number(3.14, None)},
+                Token{line:1, col:6, value: TokenValue::RightP},
+                Token{line:1, col:6, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_basic_paren_num_unit() {
+        let mut program = Tokenizer::new(String::from("(3.14rad)"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftP},
+                Token{line:1, col:2, value: TokenValue::Number(3.14, Some("rad".to_owned()))},
+                Token{line:1, col:9, value: TokenValue::RightP},
+                Token{line:1, col:9, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_basic_paren_str() {
+        let mut program = Tokenizer::new(String::from("('hello')"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftP},
+                Token{line:1, col:2, value: TokenValue::String("hello".to_owned())},
+                Token{line:1, col:9, value: TokenValue::RightP},
+                Token{line:1, col:9, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+    #[test]
+    fn test_parse_basic_paren_dash_str() {
+        let mut program = Tokenizer::new(String::from("(-hello)"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+             vec![
+                Token{line:1, col:1, value: TokenValue::LeftP},
+                Token{line:1, col:2, value: TokenValue::String("hello".to_owned())},
+                Token{line:1, col:8, value: TokenValue::RightP},
+                Token{line:1, col:8, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);

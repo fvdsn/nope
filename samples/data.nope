@@ -1,0 +1,54 @@
+# various ways to structure data
+
+[
+    void: [void _ ()]
+    null: [null]
+    bool: [true false]
+    numbers: [ -1 3.14 1_000_000 Inf -Inf NaN ]
+    numbers-with-units: [10kg 25m 13h 12min 100ft 3in 360deg] 
+    strings: [
+        "Hello World"
+        'Hello World'
+        -Hello-World
+        -with!spec.chars
+        ""
+        ''
+        -
+    ]
+    errors: [
+        !()
+        !null
+        !false
+        !-not-found
+        !'not found'
+        !500
+        ![code:404 message:"Not Found"]
+    ]
+    mixedarray: [
+        attr:99
+        "hello"
+    ]
+    keys: [
+        void:void
+        null:null
+        true:true
+        false:false
+        _:void
+        45:99
+        3.14:-pi
+        pi:3.14
+        -pi:3.14
+        'pi':3.14
+        "pi":3.14
+    ]
+    parenthesis: [
+        ()
+        (42)
+        (-foo)
+        ('hey')
+        (null)
+        ((99))
+        ([99])
+        ([key:(-val)])
+    ]
+]
