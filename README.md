@@ -176,7 +176,7 @@ let print-user |user|
 ### Parenthesis
 
 It is possible to add parenthesis around an expression. This has no effect on the code except for styling or error reporting when you
-make syntax mistakes. A set of parenthesis without an expression in it is an expression with the value `void`
+make syntax mistakes. An empty set of parenthesis is `void`
 
 ```
 ife neq a b (
@@ -185,7 +185,7 @@ ife neq a b (
     print "a is equal to b"
 )
 
-print( void eq () ) # true
+print( eq void () ) # true
 
 (add 3 4)
 ```
