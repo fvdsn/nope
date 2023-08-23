@@ -2,7 +2,7 @@
 
 > This is project is currently at a very very early stage
 > - [x] tokenizer
-> - [ ] parsing data
+> - [x] parsing data
 > - [ ] parsing expression
 > - [ ] executing expression
 > - [ ] parsing & executing function declaration
