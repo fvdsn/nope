@@ -250,6 +250,9 @@ impl Parser {
                     }
                     self.nextt();
                     self.parse_expression();
+                    if self.state != ParserState::Wip {
+                        return;
+                    }
                     self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.ast.len()-1));
                     value_node_indexes.push(self.ast.len()-1)
                 } else {
@@ -334,6 +337,10 @@ impl Parser {
             Token {value: TokenValue::LeftSqBrkt, ..} => {
                 self.parse_array()
             },
+            Token {value: TokenValue::Eof, ..} => {
+                let (line, col) = self.cur_line_col();
+                self.push_error(line, col, "ERROR: unexpected end of file".to_owned());
+            },
             _ => {
                 let (line, col) = self.cur_line_col();
                 self.push_error(line, col, "ERROR: unexpected token".to_owned());
@@ -358,5 +365,307 @@ impl Parser {
                 self.parse_expression();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_parse_empty() {
+        let mut parser = Parser::new(String::from(""));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_num() {
+        let mut parser = Parser::new(String::from("3.1415"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 3.1415)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_comment() {
+        let mut parser = Parser::new(String::from("3.1415#comment"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 3.1415)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_unit() {
+        let mut parser = Parser::new(String::from("1.5mm"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 0.0015)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_bad_unit() {
+        let mut parser = Parser::new(String::from("1.5foo"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_string() {
+        let mut parser = Parser::new(String::from("'hello'"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::String(0, "hello".to_owned())
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_true() {
+        let mut parser = Parser::new(String::from("true"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Boolean(0, true)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_false() {
+        let mut parser = Parser::new(String::from("false"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Boolean(0, false)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_null() {
+        let mut parser = Parser::new(String::from("null"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Null(0)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_void() {
+        let mut parser = Parser::new(String::from("void"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Void(0)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_void_lodash() {
+        let mut parser = Parser::new(String::from("_"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Void(0)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_undeclared_var() {
+        let mut parser = Parser::new(String::from("foobar"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_empty_array() {
+        let mut parser = Parser::new(String::from("[]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Array(1, vec![])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_array() {
+        let mut parser = Parser::new(String::from("[3.14]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.14),
+            AstNode::Array(2, vec![0])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_nums_array() {
+        let mut parser = Parser::new(String::from("[1 2 3]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 1.0),
+            AstNode::Number(2, 2.0),
+            AstNode::Number(3, 3.0),
+            AstNode::Array(4, vec![0,1,2])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_mixed_array() {
+        let mut parser = Parser::new(String::from("[true false void null 10 3.14 'hello' -world]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Boolean(1, true),
+            AstNode::Boolean(2, false),
+            AstNode::Void(3),
+            AstNode::Null(4),
+            AstNode::Number(5, 10.0),
+            AstNode::Number(6, 3.14),
+            AstNode::String(7, "hello".to_owned()),
+            AstNode::String(8, "world".to_owned()),
+            AstNode::Array(9, vec![0,1,2,3,4,5,6,7])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_nested_array() {
+        let mut parser = Parser::new(String::from("[[]]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Array(2, vec![]),
+            AstNode::Array(3, vec![0])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_unfinished_array() {
+        let mut parser = Parser::new(String::from("[[]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Array(2, vec![]),
+        ]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_keyval() {
+        let mut parser = Parser::new(String::from("[key:99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "key".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_keyval_string() {
+        let mut parser = Parser::new(String::from("['key':99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "key".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_keyval_dash_string() {
+        let mut parser = Parser::new(String::from("[-key:99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "key".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_keyval_num() {
+        let mut parser = Parser::new(String::from("[40.1:99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "40.1".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_keyval_int() {
+        let mut parser = Parser::new(String::from("[40:99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "40".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_keyval_kw() {
+        let mut parser = Parser::new(String::from("[null:99]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 99.0),
+            AstNode::KeyValue(1, "null".to_owned(), 0),
+            AstNode::Array(4, vec![1]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_missing_val_in_keyval() {
+        let mut parser = Parser::new(String::from("[key:]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_eof_in_keyval() {
+        let mut parser = Parser::new(String::from("[key:"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_invalid_key_in_keyval() {
+        let mut parser = Parser::new(String::from("[!:88]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![]);
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_nested_key_array() {
+        let mut parser = Parser::new(String::from("[foo:[bim:99]]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(6, 99.0),
+            AstNode::KeyValue(4, "bim".to_owned(), 0),
+            AstNode::Array(7, vec![1]),
+            AstNode::KeyValue(1, "foo".to_owned(), 2),
+            AstNode::Array(8, vec![3]),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
     }
 }
