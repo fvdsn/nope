@@ -292,6 +292,11 @@ impl Parser {
         return matches!(token.value, TokenValue::RightP);
     }
 
+    fn peek_swp(&self) -> bool {
+        let ref token = self.peekt();
+        return matches!(token.value, TokenValue::Swp);
+    }
+
     fn peek_colon(&self) -> bool {
         let ref token = self.peekt();
         return matches!(token.value, TokenValue::Colon);
@@ -495,6 +500,10 @@ impl Parser {
                 return;
             } else if self.peek_rsqbrkt() {
                 self.nextt();
+                if self.peek_swp() { // TODO, differenciate between array indexing and array
+                                     // declaration
+                    self.nextt();
+                }
                 self.ast.push(AstNode::Array(self.index, value_node_indexes));
                 return;
             } else {

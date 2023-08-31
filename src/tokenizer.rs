@@ -10,6 +10,7 @@ pub enum TokenValue {
     Bang,
     Comma,
     Eof,
+    Swp, // Significant whitespace, after `]`
     Number(f64, Option<String>),
     String(String),
     Name(String),
@@ -180,6 +181,14 @@ impl Tokenizer {
         });
     }
 
+    fn is_cur_rightsqbrkt(&self) -> bool {
+        if self.tokens.len() == 0 {
+            return false;
+        } else {
+            return matches!(&self.tokens[self.tokens.len()-1], Token { value: TokenValue::RightSqBrkt, ..});
+        }
+    }
+
     pub fn tokenize(&mut self) {
         self.tokenize_raw();
         // FIXME there ought to be a better way to do this
@@ -207,7 +216,13 @@ impl Tokenizer {
                 self.state = TokenizerState::Done;
                 return;
             } else if is_wp(cur) {
-                continue;
+                if self.is_cur_rightsqbrkt() {
+                    // we only care about whitespace after `]`
+                    // to differentiate an array and a value from
+                    // an indexing of a value
+                    //  - [1]foo vs [[1] foo] 
+                    self.push_token(TokenValue::Swp);
+                }
             } else if cur == '[' {
                 self.push_token(TokenValue::LeftSqBrkt);
             } else if cur == ']' {
@@ -451,6 +466,7 @@ mod tests {
                 Token{line:1, col:4, value: TokenValue::LeftSqBrkt},
                 Token{line:2, col:1, value: TokenValue::RightSqBrkt},
                 Token{line:2, col:2, value: TokenValue::RightSqBrkt},
+                Token{line:2, col:3, value: TokenValue::Swp},
                 Token{line:2, col:4, value: TokenValue::Eof},
             ]
         );
@@ -891,7 +907,9 @@ mod tests {
                 Token{line:3, col:13, value: TokenValue::String("Height".to_owned())},
                 Token{line:3, col:22, value: TokenValue::String("Weight".to_owned())},
                 Token{line:3, col:30, value: TokenValue::RightSqBrkt},
+                Token{line:3, col:31, value: TokenValue::Swp},
                 Token{line:4, col:1, value: TokenValue::RightSqBrkt},
+                Token{line:4, col:2, value: TokenValue::Swp},
                 Token{line:4, col:2, value: TokenValue::Eof},
             ],
         );
