@@ -818,6 +818,19 @@ impl Parser {
                     Some("ft") => {_num *= 0.3048},
                     Some("yd") => {_num *= 0.9144},
                     Some("F") => {_num = (_num - 32.0) * 5.0 / 9.0},
+                    Some("m3") => {},
+                    Some("l") => {_num *= 0.0001},
+                    Some("dm3") => {_num *= 0.0001},
+                    Some("dl") => {_num *= 0.00001},
+                    Some("cl") => {_num *= 0.000001},
+                    Some("ml") => {_num *= 0.0000001},
+                    Some("cm3") => {_num *= 0.0000001},
+                    Some("barrel") => {_num *= 0.158987294928},
+                    Some("cu.ft") => {_num *= 0.028},
+                    Some("gallon") => {_num *= 0.003785411784},
+                    Some("pint") => {_num *= 0.000473176473},
+                    Some("cu.in") => {_num *= 0.000016387064},
+                    Some("cu.yd") => {_num *= 0.7645549},
                     _ => {
                         let (line, col) = self.cur_line_col();
                         self.push_error(line, col, "ERROR: unknown unit".to_owned());
