@@ -35,16 +35,28 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("eval")
+                .long("eval")
+                .short('e')
+                .takes_value(true)
+                .help("Evaluates the code provided as argument value")
+                .required(false)
+        )
+        .arg(
             Arg::new("filename")
                 .help("The path to the source code")
                 .index(1)
-                .required(true)
+                .required(false)
         )
         .after_help("")
         .get_matches();
 
-    let filename = m.value_of("filename").expect("No file argument provided");
-    let source = fs::read_to_string(filename).expect("Could not read file");
+    let source = if m.is_present("eval") {
+        String::from(m.value_of("eval").expect("no code provided to --eval argument"))
+    } else {
+        let filename = m.value_of("filename").expect("No file argument provided");
+        fs::read_to_string(filename).expect("Could not read file")
+    };
 
 
     if m.is_present("tokenize") {
