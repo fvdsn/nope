@@ -81,6 +81,11 @@ fn is_alpha(c:char) -> bool {
     return c.is_alphabetic();
 }
 
+fn is_unit(c:char) -> bool {
+    // kg, cm, m3, cu.in
+    return c.is_alphabetic() || c.is_digit(10) || c == '.';
+}
+
 impl Tokenizer {
     pub fn new(source: String) -> Tokenizer {
         return Tokenizer {
@@ -301,7 +306,7 @@ impl Tokenizer {
                     } else if is_alpha(nextc) {
                         loop {
                             let nextu = self.peek1();
-                            if is_alpha(nextu) {
+                            if is_unit(nextu) {
                                 unit.push(self.nextc());
                             } else {
                                 break;
@@ -770,6 +775,35 @@ mod tests {
         );
         assert_eq!(program.state, TokenizerState::Done);
     }
+
+    #[test]
+    fn test_parse_num_123m3() {
+        let mut program = Tokenizer::new(String::from("123m3"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("m3".to_owned()))},
+                Token{line:1, col:5, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_123cu_in() {
+        let mut program = Tokenizer::new(String::from("123cu.in"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("cu.in".to_owned()))},
+                Token{line:1, col:8, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
     #[test]
     fn test_parse_num_123unit456kg() {
         let mut program = Tokenizer::new(String::from("123unit456kg"));
@@ -778,8 +812,7 @@ mod tests {
         assert_eq!(
             program.tokens,
             vec![
-                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("unit".to_owned()))},
-                Token{line:1, col:8, value: TokenValue::Number(456.0, Some("kg".to_owned()))},
+                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("unit456kg".to_owned()))},
                 Token{line:1, col:12, value: TokenValue::Eof},
             ],
         );

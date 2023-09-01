@@ -40,7 +40,7 @@ Numbers are just 64bit floats:
 ```
 
 
-You can add a unit at the end of a number declaration, this will convert its value to the default unit (internal standard). 
+You can add a unit at the end of a number declaration, this will convert its value to the default unit (SI). 
 
 ```
 print add 5kg 2T  # this will print 2005
