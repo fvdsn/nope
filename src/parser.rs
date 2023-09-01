@@ -388,7 +388,8 @@ impl Parser {
         return self.state != ParserState::Wip;
     }
 
-    fn parse_function(&mut self) {
+    fn parse_function(&mut self, func_name: Option<&str>) {
+        // func_name is used to know the name of the function for recursion
         let mut func_args:Vec<FunctionArg> = vec![];
         let (fline, fcol) = self.cur_line_col();
         let func_token_index = self.index;
@@ -470,6 +471,17 @@ impl Parser {
             self.push_error(line, col, "ERROR: missing function body".to_owned());
             return;
         }
+
+        // if we have a name for the function, push a reference to it in the environment
+        // to allow recursion
+        match func_name {
+            Some(name) => {
+                self.push_env_func_entry(name.to_string(), func_args.clone());
+            }
+            None => {}
+        };
+
+        // create an environment entry for each function argument
         for arg in &func_args {
             if arg.is_func {
                 self.push_env_arg_func_entry(arg.name.clone(), arg.func_arity);
@@ -477,10 +489,21 @@ impl Parser {
                 self.push_env_value_entry(arg.name.clone());
             }
         }
-        self.parse_expression();
+
+        self.parse_expression(None);
+
         for _ in &func_args {
             self.pop_env_entry();
         }
+
+        match func_name {
+            Some(_) => {
+                self.pop_env_entry();
+            }
+            None => {}
+        };
+
+
         if self.finished_parsing() {
             return;
         }
@@ -530,14 +553,14 @@ impl Parser {
                         },
                     }
                     self.nextt();
-                    self.parse_expression();
+                    self.parse_expression(None);
                     if self.finished_parsing() {
                         return;
                     }
                     self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.cur_ast_node_index()));
                     value_node_indexes.push(self.cur_ast_node_index())
                 } else {
-                    self.parse_expression();
+                    self.parse_expression(None);
                     value_node_indexes.push(self.cur_ast_node_index()) // put the index of the last parsed astnode
                 }
             }
@@ -554,7 +577,7 @@ impl Parser {
             return;
         }
         let if_idx = self.index;
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -565,7 +588,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -583,7 +606,7 @@ impl Parser {
             return;
         }
         let do_idx = self.index;
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -597,7 +620,7 @@ impl Parser {
         if self.finished_parsing() {
             return;
         }
-        self.parse_expression();
+        self.parse_expression(None);
         let expr2_idx = self.cur_ast_node_index();
         self.ast.push(AstNode::Do(do_idx, expr1_idx, expr2_idx));
     }
@@ -612,7 +635,7 @@ impl Parser {
             return;
         }
         let if_idx = self.index;
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -623,7 +646,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected success expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -634,7 +657,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression();
+        self.parse_expression(None);
         if self.finished_parsing() {
             return;
         }
@@ -656,8 +679,8 @@ impl Parser {
         
         let ref token = self.nextt().clone();
         match token {
-            Token {value: TokenValue::Name(ref string, ..), ..} => {
-                if is_reserved_keyword(string) {
+            Token {value: TokenValue::Name(ref var_name, ..), ..} => {
+                if is_reserved_keyword(var_name) {
                     self.push_error(line, col, "ERROR: cannot redefine reserved keyword".to_owned());
                 } else {
                     if self.peek_closing_element() {
@@ -666,7 +689,7 @@ impl Parser {
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
-                    self.parse_expression();
+                    self.parse_expression(Some(&var_name));
                     if self.finished_parsing() {
                         return;
                     }
@@ -682,21 +705,21 @@ impl Parser {
 
                     match value_node {
                         AstNode::FunctionDef(_, args,_) => {
-                            self.push_env_func_entry(string.clone(), args.clone());
+                            self.push_env_func_entry(var_name.clone(), args.clone());
                         }
                         _ => {
-                            self.push_env_value_entry(string.clone());
+                            self.push_env_value_entry(var_name.clone());
                         }
                     };
 
-                    self.parse_expression();
+                    self.parse_expression(None);
                     self.pop_env_entry();
 
                     if self.finished_parsing() {
                         return;
                     }
                     let expr_idx = self.cur_ast_node_index();
-                    self.ast.push(AstNode::Let(let_idx, string.to_owned(), def_idx, expr_idx));
+                    self.ast.push(AstNode::Let(let_idx, var_name.to_owned(), def_idx, expr_idx));
                 }
             },
             _ => {
@@ -722,7 +745,7 @@ impl Parser {
                         }
 
                         let (aline, acol) = self.peek_line_col();
-                        self.parse_expression();
+                        self.parse_expression(None);
 
                         if self.finished_parsing() {
                             return;
@@ -769,7 +792,9 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self) {
+    fn parse_expression(&mut self, var_name: Option<&str>) {
+        // var_name is the name of the variable this expression will be assigned to;
+        // used to handle recursion
         let ref token = self.nextt();
         match token {
             Token {value: TokenValue::String(ref string, ..), ..} => {
@@ -863,7 +888,7 @@ impl Parser {
             },
             Token {value: TokenValue::Bang, ..} => {
                 let bang_index = self.index;
-                self.parse_expression();
+                self.parse_expression(None);
                 if self.finished_parsing() {
                     return;
                 }
@@ -876,7 +901,7 @@ impl Parser {
                     self.nextt();
                     return;
                 }
-                self.parse_expression();
+                self.parse_expression(var_name);
                 if self.finished_parsing() {
                     return;
                 }
@@ -892,7 +917,7 @@ impl Parser {
                 self.parse_array();
             },
             Token {value: TokenValue::Pipe, ..} => {
-                self.parse_function();
+                self.parse_function(var_name);
             },
             Token {value: TokenValue::Eof, ..} => {
                 let (line, col) = self.cur_line_col();
@@ -974,7 +999,7 @@ impl Parser {
                 self.state = ParserState::Done;
                 break;
             } else {
-                self.parse_expression();
+                self.parse_expression(None);
             }
         }
     }
@@ -1562,10 +1587,16 @@ mod tests {
         assert_eq!(parser.state, ParserState::Error);
     }
 
-    #[ignore] // FIXME
     #[test]
     fn test_parse_let_func_recursive() {
         let mut parser = Parser::new(String::from("let f |a| f 3 _"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_let_func_recursive_p() {
+        let mut parser = Parser::new(String::from("let f (|a| f 3) _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
