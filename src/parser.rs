@@ -37,7 +37,9 @@ enum AstNode {
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
     ValueReference(usize, String),    // reference to the variable 'String' that contains a value
     FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
-    FunctionDef(usize, Vec<FunctionArg>, usize) // last usize is ref to function expression 
+    FunctionDef(usize, Vec<FunctionArg>, usize), // last usize is ref to function expression 
+    StaticKeyAccess(usize, String, usize)  // string is name of key, last usize is expression of
+                                            // which we access the key from
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -175,6 +177,10 @@ impl Parser {
                 println!("|");
                 self._pretty_print_ast(*expr_body, indent + 2, false);
             }
+            AstNode::StaticKeyAccess(_, key_name, expr) => {
+                println!("{}{}.", " ".repeat(original_indent), key_name);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            },
 
         }
     }
@@ -210,7 +216,7 @@ impl Parser {
             },
             _ => {},
         };
-        if self.state == ParserState::Error {
+        if self.has_parsing_error() {
             for error in &self.errors {
                 self._pretty_print_error_line(error.line, error.col, &error.message);
             }
@@ -307,6 +313,11 @@ impl Parser {
         return matches!(token.value, TokenValue::Colon);
     }
 
+    fn peek2_dot(&self) -> bool {
+        let ref token = self.peek2t();
+        return matches!(token.value, TokenValue::Dot);
+    }
+
     fn cur_line_col(&self) ->  (usize, usize){
         let ref token = self.tokenizer.tokens[self.index];
         return (token.line, token.col);
@@ -388,8 +399,20 @@ impl Parser {
         return self.state != ParserState::Wip;
     }
 
-    fn parse_function(&mut self, func_name: Option<&str>) {
-        // func_name is used to know the name of the function for recursion
+    fn has_parsing_error(&self) -> bool {
+        return self.state == ParserState::Error;
+    }
+
+    fn parse_function_def(&mut self, func_name: Option<&str>) {
+        // parses a function definiton |a b:n| body
+        // when starting the `|` must have already been consumed
+        // - adds all the argument definition to the environment
+        // - adds a reference to self as func_name to the environment if func_name is provided
+        //    - this allows recursive function calls
+        // - parses the body as an expression and puts it on the ast stack
+        // - adds the function definition AstNode on top of the stack, referencing the body
+        // - drops what was added from the environment
+        
         let mut func_args:Vec<FunctionArg> = vec![];
         let (fline, fcol) = self.cur_line_col();
         let func_token_index = self.index;
@@ -511,6 +534,10 @@ impl Parser {
     }
 
     fn parse_array(&mut self) {
+        // parses [a b k:c ...]
+        //  - when starting, the `[` token must have already been consumed
+        //  - puts all the inside expressions as AstNodes on the stack
+        //  - puts an Array AstNode on top referencing the sub expression nodes
         let mut value_node_indexes:Vec<usize> = vec![];
         let (aline, acol) = self.cur_line_col();
         loop {
@@ -568,6 +595,11 @@ impl Parser {
     }
 
     fn parse_if(&mut self) {
+        // parses if cond expr
+        // - if must have already been consumed
+        // - parses and puts the cond & expr AstNodes on the ast stack
+        // - adds a If AstNode referencing the cond and the expr on top of the ast stack
+        
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
             self.push_error(line, col, "ERROR: expected condition after 'if'".to_owned());
@@ -728,7 +760,7 @@ impl Parser {
         };
     }
 
-    fn parse_name(&mut self, name:String) {
+    fn parse_func_call(&mut self, name:String) {
         let (line, col) = self.cur_line_col();
         match self.get_env_entry(&name) {
             Some(env_entry) => {
@@ -792,9 +824,37 @@ impl Parser {
         }
     }
 
+    fn parse_static_key_access(&mut self, key_name: String) {
+        // parses foo.expr
+        // - foo must have already be consumed, is passed as key_name
+        // - the dot after foo must have already been peeked
+        // - parses expr and adds it on the ast
+        // - adds a StaticKeyAccess AstNode on top of the ast, referencing the expr
+
+        let key_name_idx = self.index;
+
+        let ref _dot = self.nextt();
+
+        let (dline, dcol) = self.cur_line_col();  // line col of the dot
+
+        if self.peek_closing_element() {
+            self.push_error(dline, dcol, "ERROR: expected expression after key access".to_owned());
+            return;
+        }
+
+        self.parse_expression(None);
+
+        if self.has_parsing_error() {
+            return;
+        }
+
+        self.ast.push(AstNode::StaticKeyAccess(key_name_idx, key_name, self.cur_ast_node_index()));
+    }
+
     fn parse_expression(&mut self, var_name: Option<&str>) {
         // var_name is the name of the variable this expression will be assigned to;
         // used to handle recursion
+        let dot_after_token = self.peek2_dot();
         let ref token = self.nextt();
         match token {
             Token {value: TokenValue::String(ref string, ..), ..} => {
@@ -883,26 +943,29 @@ impl Parser {
                 }
                 self.ast.push(AstNode::Number(self.index, _num));
             },
-            Token {value: TokenValue::Name(ref string, ..), ..} => {
-                if string == "true" {
+            Token {value: TokenValue::Name(ref name, ..), ..} => {
+                if dot_after_token {
+                    let key_name:String = name.to_owned();
+                    self.parse_static_key_access(key_name);
+                } else if name == "true" {
                     self.ast.push(AstNode::Boolean(self.index, true));
-                } else if string == "false" {
+                } else if name == "false" {
                     self.ast.push(AstNode::Boolean(self.index, false));
-                } else if string == "null" {
+                } else if name == "null" {
                     self.ast.push(AstNode::Null(self.index));
-                } else if string == "void" || string == "_" || string == "end" {
+                } else if name == "void" || name == "_" || name == "end" {
                     self.ast.push(AstNode::Void(self.index));
-                } else if string == "let" {
+                } else if name == "let" {
                     self.parse_let();
-                } else if string == "if" {
+                } else if name == "if" {
                     self.parse_if();
-                } else if string == "ife" {
+                } else if name == "ife" {
                     self.parse_ife();
-                } else if string == "do" {
+                } else if name == "do" {
                     self.parse_do();
                 } else {
-                    let _str:String = string.to_owned();
-                    self.parse_name(_str);
+                    let func_name:String = name.to_owned();
+                    self.parse_func_call(func_name);
                 }
             },
             Token {value: TokenValue::Bang, ..} => {
@@ -936,7 +999,7 @@ impl Parser {
                 self.parse_array();
             },
             Token {value: TokenValue::Pipe, ..} => {
-                self.parse_function(var_name);
+                self.parse_function_def(var_name);
             },
             Token {value: TokenValue::Eof, ..} => {
                 let (line, col) = self.cur_line_col();
@@ -1736,6 +1799,49 @@ mod tests {
     #[test]
     fn test_parse_do_wrong2() {
         let mut parser = Parser::new(String::from("(do)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_foo_dot_bar() {
+        let mut parser = Parser::new(String::from("foo.'bar'"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::String(2, "bar".to_string()),
+           AstNode::StaticKeyAccess(0, "foo".to_string(), 0),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_foo_dot_bim_dot_bar() {
+        let mut parser = Parser::new(String::from("foo.bim.'bar'"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::String(4, "bar".to_string()),
+           AstNode::StaticKeyAccess(2, "bim".to_string(), 0),
+           AstNode::StaticKeyAccess(0, "foo".to_string(), 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_foo_dot_add_1_2() {
+        let mut parser = Parser::new(String::from("foo.add 1 2"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(3, 1.0),
+           AstNode::Number(4, 2.0),
+           AstNode::FunctionCall(4, "add".to_string(), vec![0, 1]),
+           AstNode::StaticKeyAccess(0, "foo".to_string(), 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dangling_key() {
+        let mut parser = Parser::new(String::from("(foo.)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
