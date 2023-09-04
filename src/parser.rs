@@ -6,9 +6,8 @@ use crate::tokenizer::TokenizerState;
 
 fn is_reserved_keyword(name: &String) -> bool {
     return name == "true" ||  name == "false" || name == "null" ||
-        name == "void" || name == "_" || name == "let" ||
-        name == "if" || name == "ife" || name == "do" ||
-        name == "end";
+        name == "void" || name == "let" || name == "if" ||
+        name == "ife" || name == "do" || name == "end";
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -32,14 +31,19 @@ enum AstNode {
     Let(usize, String, usize, usize), // String is name of var,
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
+    Set(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
     If(usize, usize, usize), // if $cond $expr1 
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
     ValueReference(usize, String),    // reference to the variable 'String' that contains a value
     FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
     FunctionDef(usize, Vec<FunctionArg>, usize), // last usize is ref to function expression 
-    StaticKeyAccess(usize, String, usize)  // string is name of key, last usize is expression of
+    StaticKeyAccess(usize, String, usize),  // string is name of key, last usize is expression of
                                             // which we access the key from
+    DynamicKeyAccess(usize, usize, usize), // second usize is the expression that gives the key,
+                                            // last usize is the expression that gives the array,
+
+
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -159,6 +163,11 @@ impl Parser {
                 self._pretty_print_ast(*cond, indent + 2, false);
                 self._pretty_print_ast(*expr, indent + 2, false);
             },
+            AstNode::Set(_, target, expr) => {
+                println!("{}set", " ".repeat(original_indent));
+                self._pretty_print_ast(*target, indent + 2, false);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            },
             AstNode::IfElse(_, cond, expr, expr_2) => {
                 println!("{}ife", " ".repeat(original_indent));
                 self._pretty_print_ast(*cond, indent + 2, false);
@@ -181,7 +190,11 @@ impl Parser {
                 println!("{}{}.", " ".repeat(original_indent), key_name);
                 self._pretty_print_ast(*expr, indent + 2, false);
             },
-
+            AstNode::DynamicKeyAccess(_, key_expr, expr) => {
+                print!("{}[]: ", " ".repeat(original_indent));
+                self._pretty_print_ast(*key_expr, indent + 2, true);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            },
         }
     }
 
@@ -303,6 +316,11 @@ impl Parser {
         return matches!(token.value, TokenValue::Swp);
     }
 
+    fn peek_comma(&self) -> bool {
+        let ref token = self.peekt();
+        return matches!(token.value, TokenValue::Comma);
+    }
+
     fn peek_colon(&self) -> bool {
         let ref token = self.peekt();
         return matches!(token.value, TokenValue::Colon);
@@ -340,7 +358,11 @@ impl Parser {
     }
 
     fn push_env_func_entry(&mut self, name: String, args: Vec<FunctionArg>) {
-        self.env.push(EnvEntry { name:name, is_func:true, func_args:args });
+        if name == "_" {    // _ must keep having the void value
+            self.env.push(EnvEntry { name:name, is_func:false, func_args:vec![] });
+        } else {
+            self.env.push(EnvEntry { name:name, is_func:true, func_args:args });
+        }
     }
 
     fn push_env_arg_func_entry(&mut self, name: String, argc:usize) {
@@ -533,13 +555,17 @@ impl Parser {
         self.ast.push(AstNode::FunctionDef(func_token_index, func_args, self.cur_ast_node_index()));
     }
 
-    fn parse_array(&mut self) {
+    fn parse_array_or_dynamic_key_access(&mut self) {
         // parses [a b k:c ...]
         //  - when starting, the `[` token must have already been consumed
         //  - puts all the inside expressions as AstNodes on the stack
         //  - puts an Array AstNode on top referencing the sub expression nodes
         let mut value_node_indexes:Vec<usize> = vec![];
         let (aline, acol) = self.cur_line_col();
+        let array_token_index = self.index;
+        let mut has_func_val = false;
+        let mut fline = 0;
+        let mut fcol = 0;
         loop {
             if self.finished_parsing() {
                 return;
@@ -550,12 +576,39 @@ impl Parser {
                 return;
             } else if self.peek_rsqbrkt() {
                 self.nextt();
-                if self.peek_swp() { // TODO, differenciate between array indexing and array
-                                     // declaration
-                    self.nextt();
+                if self.peek_swp() || self.peek_rsqbrkt() || self.peek_rightp() || self.peek_eof() {
+                    if self.peek_swp() {
+                        self.nextt();
+                    }
+                    if has_func_val {
+                        self.push_error(fline, fcol, "ERROR functions are not allowed in data structures".to_owned());
+                    }
+                    self.ast.push(AstNode::Array(self.index, value_node_indexes));
+                    return;
+                } else if value_node_indexes.len() != 1 {
+                    self.push_error(aline, acol, "ERROR key index must have exactly one key".to_owned());
+                } else {
+                    let key_node_index = self.cur_ast_node_index();
+                    
+                    let ast_node = self.cur_ast_node();
+
+                    match ast_node {
+                        AstNode::FunctionDef(_, args, _) => {
+                            if args.len() != 2 {
+                                self.push_error(aline, acol, "ERROR filter function must have 2 arguments (key, value)".to_owned());
+                            }
+                        }, 
+                        _ => {}
+                    }
+
+                    self.parse_expression(None);
+                    if self.has_parsing_error() {
+                        return;
+                    }
+                    let value_node_index = self.cur_ast_node_index();
+                    self.ast.push(AstNode::DynamicKeyAccess(array_token_index, key_node_index, value_node_index));
+                    return;
                 }
-                self.ast.push(AstNode::Array(self.index, value_node_indexes));
-                return;
             } else {
                 if self.peek2_colon() {
                     self.nextt();
@@ -587,7 +640,25 @@ impl Parser {
                     self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.cur_ast_node_index()));
                     value_node_indexes.push(self.cur_ast_node_index())
                 } else {
+                    let (line, col) = self.peek_line_col();
+
                     self.parse_expression(None);
+                    if self.finished_parsing() {
+                        return;
+                    }
+
+                    let ast_node = self.cur_ast_node();
+
+                    match ast_node {
+                        AstNode::FunctionDef(_, _, _) => {
+                            if !has_func_val {
+                                has_func_val = true;
+                                fline = line;
+                                fcol = col;
+                            }
+                        }, 
+                        _ => {}
+                    }
                     value_node_indexes.push(self.cur_ast_node_index()) // put the index of the last parsed astnode
                 }
             }
@@ -628,6 +699,40 @@ impl Parser {
         self.ast.push(AstNode::If(if_idx, cond_idx, expr_idx));
     }
 
+    fn parse_set(&mut self) {
+        // parses set target expr
+        // - set must have already been consumed
+        
+        let (line, col) = self.peek_line_col();
+        if self.peek_closing_element() {
+            self.push_error(line, col, "ERROR: expected target after 'set'".to_owned());
+            return;
+        }
+        if self.finished_parsing() {
+            return;
+        }
+
+        let set_idx = self.index;
+        self.parse_expression(None);
+        if self.finished_parsing() {
+            return;
+        }
+
+        let target_idx = self.cur_ast_node_index();
+        if self.peek_closing_element() {
+            let (eline, ecol) = self.peek_line_col();
+            self.push_error(line, col, "this set is missing an expression".to_owned());
+            self.push_error(eline, ecol, "ERROR: expected expression for 'set'".to_owned());
+            return;
+        }
+        self.parse_expression(None);
+        if self.finished_parsing() {
+            return;
+        }
+        let expr_idx = self.cur_ast_node_index();
+        self.ast.push(AstNode::Set(set_idx, target_idx, expr_idx));
+    }
+
     fn parse_do(&mut self) {
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
@@ -643,16 +748,22 @@ impl Parser {
             return;
         }
         let expr1_idx = self.cur_ast_node_index();
-        if self.peek_closing_element() {
+
+        if self.peek_rightp() {
+            self.ast.push(AstNode::Void(do_idx));
+        } else if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_error(line, col, "this do is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'do'".to_owned());
             return;
-        }
-        if self.finished_parsing() {
+        } else if self.finished_parsing() {
             return;
+        } else {
+            self.parse_expression(None);
+            if self.finished_parsing() {
+                return;
+            }
         }
-        self.parse_expression(None);
         let expr2_idx = self.cur_ast_node_index();
         self.ast.push(AstNode::Do(do_idx, expr1_idx, expr2_idx));
     }
@@ -760,15 +871,17 @@ impl Parser {
         };
     }
 
+
     fn parse_func_call(&mut self, name:String) {
         let (line, col) = self.cur_line_col();
+        let mut uses_commas = false;
         match self.get_env_entry(&name) {
             Some(env_entry) => {
                 if !env_entry.is_func {
                     self.ast.push(AstNode::ValueReference(self.index, name));
                 } else {
                     let mut arg_node_indexes: Vec<usize> = vec![];
-                    for arg in env_entry.func_args {
+                    for (arg_index, arg) in env_entry.func_args.iter().enumerate() {
                         if self.peek_closing_element() {
                             let (vline, vcol) = self.peek_line_col();
                             self.push_error(line, col, "this function call is missing an argument".to_owned());
@@ -812,6 +925,26 @@ impl Parser {
                                 }
                             };
                         }
+
+                        if arg_index < env_entry.func_args.len() - 1 {
+                            if self.peek_comma() {
+                                if arg_index == 0 {
+                                    uses_commas = true;
+                                    self.nextt();
+                                } else if uses_commas {
+                                    self.nextt();
+                                } else {
+                                    self.push_error(line, col, "ERROR: this function call is missing some commas between its arguments".to_owned());
+                                    return;
+                                }
+                            } else if uses_commas {
+                                let (cline, ccol) = self.peek_line_col();
+                                self.push_error(line, col, "this function call is missing some commas between its arguments".to_owned());
+                                self.push_error(cline, ccol, "ERROR: expected a comma here".to_owned());
+                                return;
+                            }
+                        }
+
                         arg_node_indexes.push(self.cur_ast_node_index()); 
                     }
                     self.ast.push(AstNode::FunctionCall(self.index, name, arg_node_indexes));
@@ -866,6 +999,16 @@ impl Parser {
                 let _unit = unit.to_owned();
                 match _unit.as_deref() {
                     None => {},
+                    Some("pi") => {_num *= 3.141592653589793},
+                    Some("sqrt2") => {_num *= 1.414213562373095},
+                    Some("sqrt0.5") => {_num *= 0.7071067811865476},
+                    Some("sqrt2pi") => {_num *= 2.50662827463100050241576528481104525},
+                    Some("e") => {_num *= 2.718281828459045},
+                    Some("ln2") => {_num *= 0.69314718056},
+                    Some("ln10") => {_num *= 2.30258509299},
+                    Some("log10e") => {_num *= 0.4342944819032518},
+                    Some("log2e") => {_num *= 1.4426950408889634},
+                    Some("phi") => {_num *= 1.618033988749894},
                     Some("GT") => {_num *= 1000000000000.0},
                     Some("MT") => {_num *= 1000000000.0},
                     Some("kT") => {_num *= 1000000.0},
@@ -957,6 +1100,8 @@ impl Parser {
                     self.ast.push(AstNode::Void(self.index));
                 } else if name == "let" {
                     self.parse_let();
+                } else if name == "set" {
+                    self.parse_set();
                 } else if name == "if" {
                     self.parse_if();
                 } else if name == "ife" {
@@ -996,7 +1141,7 @@ impl Parser {
                 }
             },
             Token {value: TokenValue::LeftSqBrkt, ..} => {
-                self.parse_array();
+                self.parse_array_or_dynamic_key_access();
             },
             Token {value: TokenValue::Pipe, ..} => {
                 self.parse_function_def(var_name);
@@ -1037,9 +1182,9 @@ impl Parser {
 
         // |a|
         for name in vec![
-            "print", "range", "not", "decr", "incr", "increase",
+            "print", "range", "not", "decr", "incr", "increment",
             "sin", "cos", "tan", "inv", "/max", "/min", "/and",
-            "/or", "/eq", "/add", "/mult", "len", "neg"
+            "/or", "/eq", "/add", "/mult", "len", "neg", "return"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
@@ -1790,8 +1935,20 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_do_wrong1() {
+    fn test_parse_do_early_close() {
         let mut parser = Parser::new(String::from("(do 64)"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 64.0),
+            AstNode::Void(1),
+            AstNode::Do(1, 0, 1)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_do_wrong1() {
+        let mut parser = Parser::new(String::from("[do 64]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -1799,6 +1956,13 @@ mod tests {
     #[test]
     fn test_parse_do_wrong2() {
         let mut parser = Parser::new(String::from("(do)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_do_wrong3() {
+        let mut parser = Parser::new(String::from("do 64"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -1842,6 +2006,238 @@ mod tests {
     #[test]
     fn test_parse_dangling_key() {
         let mut parser = Parser::new(String::from("(foo.)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_dynkey_num() {
+        let mut parser = Parser::new(String::from("[3]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(1, 3.0),
+           AstNode::Number(3, 12.0),
+           AstNode::DynamicKeyAccess(0, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_null() {
+        let mut parser = Parser::new(String::from("[null]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Null(1),
+           AstNode::Number(3, 12.0),
+           AstNode::DynamicKeyAccess(0, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_void() {
+        let mut parser = Parser::new(String::from("[_]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Void(1),
+           AstNode::Number(3, 12.0),
+           AstNode::DynamicKeyAccess(0, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_bool() {
+        let mut parser = Parser::new(String::from("[true]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Boolean(1, true),
+           AstNode::Number(3, 12.0),
+           AstNode::DynamicKeyAccess(0, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_str() {
+        let mut parser = Parser::new(String::from("['key']12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::String(1, "key".to_string()),
+           AstNode::Number(3, 12.0),
+           AstNode::DynamicKeyAccess(0, 0, 1)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_var() {
+        let mut parser = Parser::new(String::from("let pi 3.14 [pi]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(2, 3.14),
+           AstNode::ValueReference(4, "pi".to_string()),
+           AstNode::Number(6, 12.0),
+           AstNode::DynamicKeyAccess(3, 1, 2),
+           AstNode::Let(0, "pi".to_string(), 0, 3)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_key_filter() {
+        let mut parser = Parser::new(String::from("[key:45]12"));
+        // filters all elements with key 'key' and value 45
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(3, 45.0),
+           AstNode::KeyValue(1, "key".to_string(), 0),
+           AstNode::Number(5, 12.0),
+           AstNode::DynamicKeyAccess(0, 1, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_func_filter() {
+        let mut parser = Parser::new(String::from("[|k v| true]12"));
+        // filters all elements with key 'key' and value 45
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Boolean(5, true),
+            AstNode::FunctionDef(1, vec![
+                 FunctionArg { name: "k".to_string(), is_func: false, func_arity: 0 },
+                 FunctionArg { name: "v".to_string(), is_func: false, func_arity: 0 }
+            ], 0),
+            AstNode::Number(7, 12.0),
+            AstNode::DynamicKeyAccess(0, 1, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_rec() {
+        let mut parser = Parser::new(String::from("[3][4]12"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(1, 3.0),
+           AstNode::Number(4, 4.0),
+           AstNode::Number(6, 12.0),
+           AstNode::DynamicKeyAccess(3, 1, 2),
+           AstNode::DynamicKeyAccess(0, 0, 3)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_to_array() {
+        let mut parser = Parser::new(String::from("[3][4]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.0),
+            AstNode::Number(4, 4.0),
+            AstNode::Array(5, vec![1]),
+            AstNode::DynamicKeyAccess(0, 0, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_in_array() {
+        let mut parser = Parser::new(String::from("[[3][4]]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 3.0),
+            AstNode::Number(5, 4.0),
+            AstNode::Array(6, vec![1]),
+            AstNode::DynamicKeyAccess(1, 0, 2),
+            AstNode::Array(7, vec![3])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_in_array_paren() {
+        let mut parser = Parser::new(String::from("[([3])[4]]"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 3.0),
+            AstNode::Array(4, vec![0]),
+            AstNode::Number(7, 4.0),
+            AstNode::Array(8, vec![2]),
+            AstNode::Array(9, vec![1, 3])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dynkey_func_filter_wrong_argc0() {
+        let mut parser = Parser::new(String::from("[||true]33"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_dynkey_func_filter_wrong_argc1() {
+        let mut parser = Parser::new(String::from("[|v|true]33"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_dynkey_func_filter_wrong_argc3() {
+        let mut parser = Parser::new(String::from("[|a b c|true]33"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_no_func_in_arrays() {
+        let mut parser = Parser::new(String::from("[|a|true]"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_dont_redefine_void() {
+        // _ must always stay a void value. assigning a value to it has no effect
+        let mut parser = Parser::new(String::from("let _ |a| true _"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_dont_redefine_void_in_func_args() {
+        // _ must always stay a void value.
+        let mut parser = Parser::new(String::from("|_:2| _"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_no_commas() {
+        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1 2 3"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_all_commas() {
+        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1, 2, 3"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_missing_comma1() {
+        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1 2, 3"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_missing_comma2() {
+        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1, 2 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }

@@ -11,21 +11,21 @@ let quicksort |A|
         let i decr lo
         do iter range[lo decr hi] |j|
             if <= [j]A pivot
-                do increase i
+                do increment i
                 do swap A i j
                 _
-        do increase i 
+        do increment i 
         do swap A i hi
         i
 
     let sort |A lo hi|
-        if and >= lo 0, < lo hi
+        if and >= lo 0 < lo hi
             let p partition A lo hi
-            do sort A, lo, decr p
-            do sort A, incr p, hi
+            do sort A lo decr p
+            do sort A incr p hi
             _
 
-    do sort A, 0, decr len A
+    do sort A 0 decr len A
     A
 
 print quicksort [9 2 8 4 3 5 7 1 0 6]
