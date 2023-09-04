@@ -27,7 +27,7 @@ let quicksort |A| (
         )
     )
 
-    do sort A, 0, decr len A
+    do (sort A, 0, decr len A)
     return A
 )
 
