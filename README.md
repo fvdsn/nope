@@ -3,9 +3,9 @@
 > This is project is currently at a very very early stage
 > - [x] tokenizer
 > - [x] parsing data
-> - [ ] parsing expression
-> - [ ] executing expression
-> - [ ] parsing & executing function declaration
+> - [x] parsing expressions
+> - [ ] executing expressions
+> - [ ] parsing & executing function declarations
 > - [ ] initial stdlib
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
@@ -46,6 +46,12 @@ You can add a unit at the end of a number declaration, this will convert its val
 print add 5kg 2T  # this will print 2005
 ```
 
+This is also how you access the usual mathematical constants
+
+```
+let area mult 10cm cos 0.5pi
+```
+
 ### Booleans
 
 Boolean logic is pretty straigthforward, `true`, `false`, boolean functions `and a b`, `or a b`, `not a`.
@@ -67,6 +73,12 @@ Any sequence of characters that starts with a `-` and is not a number is also in
 "foo" 'foo' -foo
 ```
 
+This is makes it cleaner to use string as enums
+
+```
+let data parse -json readtxt -utf8 "./file.json"
+```
+
 Strings that respect well known formats are automatically parsed and the parsed results are available as fields
 
 ```
@@ -85,6 +97,16 @@ You can mix and match keyed and indexed values in the same array
 
 ```
 let xml [-div id:123 class:'foo bar' "Click on this" [-a href:'#' "link"]]
+```
+
+You can also make two dimensional arrays by separating rows with `,` this is used for linear algebra.
+
+```
+let mat3 [
+    1 2 3,
+    4 5 6,
+    7 8 9,
+]
 ```
 
 ### `null` and `void` / `_`
@@ -188,6 +210,24 @@ ife neq a b (
 print( eq void () ) # true
 
 (add 3 4)
+```
+
+parenthesis can also close a do expression early which then implicitly returns void
+
+```
+def print-point |p| (
+    do print x.p
+    do print y.p
+)
+```
+
+# Commas
+
+It is possible to add commas between function arguments. If you choose to do so you must put a comma
+between every argument of that function call. This is again an optional way to improve readability & easedebugging
+
+```
+print func-with-many-args -opt, add 2 3, and == x y <= x z
 ```
 
 ### Macros 
