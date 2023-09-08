@@ -224,7 +224,7 @@ def print-point |p| (
 # Commas
 
 It is possible to add commas between function arguments. If you choose to do so you must put a comma
-between every argument of that function call. This is again an optional way to improve readability & easedebugging
+between every argument of that function call. This is again an optional way to improve readability & ease debugging
 
 ```
 print func-with-many-args -opt, add 2 3, and == x y <= x z
