@@ -3,7 +3,7 @@
 > This is project is currently at a very very early stage
 > - [x] tokenizer
 > - [x] parsing data
-> - [x] parsing expressions
+> - [x] parsing a full program
 > - [ ] executing expressions
 > - [ ] parsing & executing function declarations
 > - [ ] initial stdlib
@@ -99,6 +99,8 @@ You can mix and match keyed and indexed values in the same array
 let xml [-div id:123 class:'foo bar' "Click on this" [-a href:'#' "link"]]
 ```
 
+#### Matrices
+
 You can also make two dimensional arrays by separating rows with `,` this is used for linear algebra.
 
 ```
@@ -107,7 +109,14 @@ let mat3 [
     4 5 6,
     7 8 9,
 ]
+
+print rowc mat3   # 3
+print colc mat3   # 3
+print len mat3    # 9
 ```
+
+The commas can only divide the array with consistently sized rows. The array usually behaves as a regular
+array, iteration works in one dimension. But linear algebra functions can make use of `colc` and `rowc`.
 
 ### `null` and `void` / `_`
 
