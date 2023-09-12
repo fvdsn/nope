@@ -4,8 +4,10 @@
 > - [x] tokenizer
 > - [x] parsing data
 > - [x] parsing a full program
-> - [ ] executing expressions
-> - [ ] parsing & executing function declarations
+> - [ ] evaluate basic expressions
+>   - [x] evaluate numbers, print, add, sub, mult, div, neg
+>   - [ ] ...
+> - [ ] evaluate function declarations
 > - [ ] initial stdlib
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
