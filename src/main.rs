@@ -39,6 +39,14 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("ast")
+                .long("ast")
+                .short('a')
+                .takes_value(false)
+                .help("Prints the ast of the program")
+                .required(false)
+        )
+        .arg(
             Arg::new("eval")
                 .long("eval")
                 .short('e')
@@ -72,6 +80,9 @@ fn main() {
         parser.parse();
         parser.tokenizer.print();
         parser.print();
+    } else if m.is_present("ast") {
+        let mut parser = Parser::new(String::from(source));
+        parser.parse();
         parser.pretty_print();
     } else {
         let mut vm = Vm::new();
