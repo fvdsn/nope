@@ -4,9 +4,13 @@ use clap::{Arg, Command};
 
 mod tokenizer;
 mod parser;
+mod vm;
 
-use crate::tokenizer::Tokenizer;
-use crate::parser::Parser;
+use crate::{
+    tokenizer::Tokenizer,
+    parser::Parser,
+    vm::Vm,
+};
 
 
 fn main() {
@@ -68,9 +72,9 @@ fn main() {
         parser.parse();
         parser.tokenizer.print();
         parser.print();
-    } else {
-        let mut parser = Parser::new(String::from(source));
-        parser.parse();
         parser.pretty_print();
+    } else {
+        let mut vm = Vm::new();
+        vm.interpret(String::from(source));
     }
 }

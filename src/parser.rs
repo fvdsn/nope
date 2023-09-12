@@ -11,14 +11,14 @@ fn is_reserved_keyword(name: &String) -> bool {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-struct FunctionArg {
+pub struct FunctionArg {
     name: String,
     is_func: bool,
     func_arity: usize,
 }
 
 #[derive(PartialEq, Debug, Clone)]
-enum AstNode {
+pub enum AstNode {
     // first usize is index of related token in tokens array
     Number(usize, f64),
     String(usize, String),
@@ -70,7 +70,7 @@ pub struct ParserError {
 #[derive(PartialEq, Debug)]
 pub struct Parser {
     pub tokenizer: Tokenizer,
-    ast: Vec<AstNode>,
+    pub ast: Vec<AstNode>,
     env: Vec<EnvEntry>,
     nextindex: usize,
     index: usize,
@@ -218,6 +218,27 @@ impl Parser {
         }
         println!("line: {}, col: {} // {}", line, col, message);
         //println!("  - {}", message);
+    }
+
+    pub fn has_errors(&self) -> bool {
+        return matches!(self.tokenizer.state, TokenizerState::Error(_)) || self.has_parsing_error();
+    }
+
+    pub fn print_errors(&self) {
+        let ref tokenizer_state = self.tokenizer.state;
+        match tokenizer_state {
+            TokenizerState::Error(message) => {
+                self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
+                return;
+            },
+            _ => {},
+        };
+        if self.has_parsing_error() {
+            for error in &self.errors {
+                self._pretty_print_error_line(error.line, error.col, &error.message);
+            }
+            return;
+        }
     }
 
     pub fn pretty_print(&self) {
@@ -421,7 +442,7 @@ impl Parser {
         return self.state != ParserState::Wip;
     }
 
-    fn has_parsing_error(&self) -> bool {
+    pub fn has_parsing_error(&self) -> bool {
         return self.state == ParserState::Error;
     }
 
@@ -1177,6 +1198,13 @@ impl Parser {
                         FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
                     ]
                 }
+            );
+        }
+        
+        // ||
+        for name in vec!["random"] {
+            self.env.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
             );
         }
 
