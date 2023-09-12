@@ -101,6 +101,7 @@ impl Vm {
     }
 
     pub fn interpret(&mut self, code: String) -> InterpretResult {
+        println!("create parser...");
         let mut parser = Parser::new(code);
 
         parser.parse();
@@ -110,12 +111,14 @@ impl Vm {
             return InterpretResult::CompileError;
         }
 
+        println!("compile...");
         if !self.compile(&parser.ast) {
             println!("compilation error");
             self.chunk.pretty_print();
             return InterpretResult::CompileError
         }
 
+        println!("run...\n");
         return self.run();
     }
 
@@ -127,6 +130,7 @@ impl Vm {
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
                     if !self.compile_node(ast, *arg) {
+                        println!("error compiling function {}", name);
                         return false;
                     }
                 }
@@ -138,7 +142,10 @@ impl Vm {
                     "neg" => { self.chunk.push_op(node_idx, OpCode::Negate) },
                     "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
                     "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
-                    _ => { return false; }
+                    _ => { 
+                        println!("unknown function {}", name);
+                        return false; 
+                    }
                 };
             },
             _ => {
@@ -149,10 +156,14 @@ impl Vm {
     }
 
     pub fn compile(&mut self, ast: &Vec<AstNode>) -> bool {
-        if !self.compile_node(ast, ast.len() - 1) {
-            return false;
+        if ast.len() > 0 {
+            if !self.compile_node(ast, ast.len() - 1) {
+                return false;
+            }
+            self.chunk.push_op(self.chunk.ast_map[self.chunk.ast_map.len()-1], OpCode::Return);
+        } else {
+            self.chunk.push_op(0, OpCode::Return);
         }
-        self.chunk.push_op(self.chunk.ast_map[self.chunk.ast_map.len()-1], OpCode::Return);
         return true;
     }
 

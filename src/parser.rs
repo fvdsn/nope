@@ -199,6 +199,7 @@ impl Parser {
     }
 
     fn _pretty_print_error_line(&self, line:usize, col:usize, message: &String) {
+        println!("");
         let lines: Vec<&str> = self.tokenizer.source.lines().collect();
         let lineidx = line - 1;
         if lineidx >= 1 {
@@ -1024,7 +1025,8 @@ impl Parser {
                     Some("sqrt2") => {_num *= 1.414213562373095},
                     Some("sqrt0.5") => {_num *= 0.7071067811865476},
                     Some("sqrt2pi") => {_num *= 2.50662827463100050241576528481104525},
-                    Some("e") => {_num *= 2.718281828459045},
+                    // this is kind of confusing with 10e 5 looks like 10 exponent 5
+                    //Some("e") => {_num *= 2.718281828459045},
                     Some("ln2") => {_num *= 0.69314718056},
                     Some("ln10") => {_num *= 2.30258509299},
                     Some("log10e") => {_num *= 0.4342944819032518},
@@ -1239,6 +1241,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) {
+        println!("tokenize...");
         self.tokenizer.tokenize();
 
         if self.tokenizer.state != TokenizerState::Done {
@@ -1247,15 +1250,22 @@ impl Parser {
 
         self.set_stdlib();
 
-        loop {
-            if self.finished_parsing() {
-                break;
-            } else if self.peek_eof() {
-                self.state = ParserState::Done;
-                break;
-            } else {
-                self.parse_expression(None);
-            }
+        println!("build ast...");
+
+        if self.peek_eof() {
+            self.state = ParserState::Done;
+            return;
+        }
+
+        self.parse_expression(None);
+
+        if self.has_parsing_error() {
+            return;
+        } else if !self.peek_eof() {
+            let (line, col) = self.peek_line_col();
+            self.push_error(line, col, "ERROR: a nope file should be a single expression".to_owned());
+        } else {
+            self.state = ParserState::Done;
         }
     }
 }
@@ -2266,6 +2276,13 @@ mod tests {
     #[test]
     fn test_parse_missing_comma2() {
         let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1, 2 3"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_multi_expr() {
+        let mut parser = Parser::new(String::from("print 3.14 print 4.92"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }

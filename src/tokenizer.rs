@@ -68,6 +68,11 @@ fn is_num_separator(c:char) -> bool {
         || c == ')' || c == '(';
 }
 
+fn is_num_spacer(c:char) -> bool {
+    return c == ' ' || c == '\t' || c == '\n' || c == ',' || c == ')' || c == ']'
+        || c == '\0' || c == '#' || c == '|' || c == ':';
+}
+
 fn is_namechar(c:char) -> bool {
     return !is_wp(c) && !is_separator(c);
 }
@@ -152,7 +157,7 @@ impl Tokenizer {
         }
     }
 
-    fn match_and_push_token(&mut self, token: &str, value:TokenValue) -> bool {
+    fn match_and_push_number_token(&mut self, token: &str, value:TokenValue) -> bool {
         if token.len() + self.index > self.chars.len() {
             return false;
         } else {
@@ -267,13 +272,17 @@ impl Tokenizer {
 
             } else if 
                 // here we match for specific keywords
-                self.match_and_push_token("-NaN", TokenValue::Number(f64::NAN, None)) ||
-                self.match_and_push_token("NaN", TokenValue::Number(f64::NAN, None)) ||
-                self.match_and_push_token("-Inf", TokenValue::Number(f64::NEG_INFINITY, None)) ||
-                self.match_and_push_token("Inf", TokenValue::Number(f64::INFINITY, None)) ||
-                self.match_and_push_token("Pi", TokenValue::Number(std::f64::consts::PI, None)) ||
-                self.match_and_push_token("-Pi", TokenValue::Number(-std::f64::consts::PI, None))
+                self.match_and_push_number_token("-NaN", TokenValue::Number(f64::NAN, None)) ||
+                self.match_and_push_number_token("NaN", TokenValue::Number(f64::NAN, None)) ||
+                self.match_and_push_number_token("-Inf", TokenValue::Number(f64::NEG_INFINITY, None)) ||
+                self.match_and_push_number_token("Inf", TokenValue::Number(f64::INFINITY, None)) ||
+                self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None)) ||
+                self.match_and_push_number_token("-Pi", TokenValue::Number(-std::f64::consts::PI, None))
             {
+
+                if !is_num_spacer(self.peek1()) {
+                    self.state = TokenizerState::Error("Expected spacing after number".to_owned());
+                }
                 continue;
             } else if is_digit(cur) || (cur == '-' && is_digit(self.peek1())) {
                 // here we parse numbers
@@ -329,6 +338,9 @@ impl Tokenizer {
                             value: TokenValue::Number(val, if unitstr.len() > 0 { Some(unitstr) } else {None}),
                         }),
                         Err(e) => self.state = TokenizerState::Error(e.to_string())
+                    }
+                    if !is_num_spacer(self.peek1()) {
+                        self.state = TokenizerState::Error("Expected spacing after number".to_owned());
                     }
                 }
             } else if cur == '-' {
@@ -817,6 +829,13 @@ mod tests {
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_num_not_spaced() {
+        let mut program = Tokenizer::new(String::from("3-3"));
+        program.tokenize();
+        assert_eq!(program.state, TokenizerState::Error("Expected spacing after number".to_owned()));
     }
 
 
