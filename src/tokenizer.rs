@@ -98,8 +98,8 @@ impl Tokenizer {
             col: 1,
             index: 0,
             nextindex: 0,
-            source: source.to_owned(),
             chars: source.chars().collect(),
+            source: source,
             tokens: Vec::new(),
             state: TokenizerState::Wip,
         };
