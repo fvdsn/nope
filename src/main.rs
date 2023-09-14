@@ -4,6 +4,7 @@ use clap::{Arg, Command};
 
 mod tokenizer;
 mod parser;
+mod units;
 mod vm;
 
 use crate::{

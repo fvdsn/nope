@@ -3,6 +3,7 @@ use crate::tokenizer::Tokenizer;
 use crate::tokenizer::Token;
 use crate::tokenizer::TokenValue;
 use crate::tokenizer::TokenizerState;
+use crate::units::convert_unit_to_si;
 
 fn is_reserved_keyword(name: &String) -> bool {
     return name == "true" ||  name == "false" || name == "null" ||
@@ -42,8 +43,7 @@ pub enum AstNode {
                                             // which we access the key from
     DynamicKeyAccess(usize, usize, usize), // second usize is the expression that gives the key,
                                             // last usize is the expression that gives the array,
-
-
+    CodeBlock(usize, Vec<usize>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -72,6 +72,7 @@ pub struct Parser {
     pub tokenizer: Tokenizer,
     pub ast: Vec<AstNode>,
     env: Vec<EnvEntry>,
+    block_var_count: usize,
     nextindex: usize,
     index: usize,
     state: ParserState,
@@ -85,6 +86,7 @@ impl Parser {
             ast: vec![],
             env: vec![],
             nextindex: 0,
+            block_var_count: 0,
             index: 0,
             state: ParserState::Wip,
             errors: vec![],
@@ -137,6 +139,11 @@ impl Parser {
                     self._pretty_print_ast(*index, indent + 2, false);
                 }
                 println!("{}]", " ".repeat(indent));
+            },
+            AstNode::CodeBlock(_, expressions) => {
+                for expression in expressions {
+                    self._pretty_print_ast(*expression, indent, false);
+                }
             },
             AstNode::KeyValue(_, key, val_index) => {
                 print!("{}{}: ", " ".repeat(original_indent), key);
@@ -218,11 +225,10 @@ impl Parser {
             }
         }
         println!("line: {}, col: {} // {}", line, col, message);
-        //println!("  - {}", message);
     }
 
-    pub fn has_errors(&self) -> bool {
-        return matches!(self.tokenizer.state, TokenizerState::Error(_)) || self.has_parsing_error();
+    pub fn failed(&self) -> bool {
+        return self.tokenizer.failed() || self.parsing_failed();
     }
 
     pub fn print_errors(&self) {
@@ -234,7 +240,7 @@ impl Parser {
             },
             _ => {},
         };
-        if self.has_parsing_error() {
+        if self.parsing_failed() {
             for error in &self.errors {
                 self._pretty_print_error_line(error.line, error.col, &error.message);
             }
@@ -251,7 +257,7 @@ impl Parser {
             },
             _ => {},
         };
-        if self.has_parsing_error() {
+        if self.parsing_failed() {
             for error in &self.errors {
                 self._pretty_print_error_line(error.line, error.col, &error.message);
             }
@@ -439,11 +445,7 @@ impl Parser {
         }
     }
 
-    fn finished_parsing(&self) -> bool {
-        return self.state != ParserState::Wip;
-    }
-
-    pub fn has_parsing_error(&self) -> bool {
+    pub fn parsing_failed(&self) -> bool {
         return self.state == ParserState::Error;
     }
 
@@ -461,9 +463,7 @@ impl Parser {
         let (fline, fcol) = self.cur_line_col();
         let func_token_index = self.index;
         loop {
-            if self.finished_parsing() {
-                return;
-            } else if self.peek_closing_element() {
+            if self.peek_closing_element() {
                 let (line, col) = self.peek_line_col();
                 self.push_error(fline, fcol, "start of unterminated function".to_owned());
                 self.push_error(line, col, "ERROR: missing | to close the function argument list".to_owned());
@@ -484,10 +484,10 @@ impl Parser {
                     // TODO handle _ dummy arguments
 
                     if self.peek_colon() { // parsing "|arg:n| to argc / is_func
+                                           
                         self.nextt();
-                        if self.finished_parsing() {
-                            return;
-                        } else if self.peek_closing_element() {
+
+                        if self.peek_closing_element() {
                             let (line, col) = self.peek_line_col();
                             self.push_error(line, col, "ERROR: missing function argument argcount".to_owned());
                             return;
@@ -531,9 +531,7 @@ impl Parser {
             }
         }
 
-        if self.finished_parsing() {
-            return;
-        } else if self.peek_closing_element() {
+        if self.peek_closing_element() {
             let (line, col) = self.peek_line_col();
             self.push_error(line, col, "ERROR: missing function body".to_owned());
             return;
@@ -557,7 +555,10 @@ impl Parser {
             }
         }
 
-        self.parse_expression(None);
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
+            return;
+        }
 
         for _ in &func_args {
             self.pop_env_entry();
@@ -571,9 +572,6 @@ impl Parser {
         };
 
 
-        if self.finished_parsing() {
-            return;
-        }
         self.ast.push(AstNode::FunctionDef(func_token_index, func_args, self.cur_ast_node_index()));
     }
 
@@ -589,9 +587,7 @@ impl Parser {
         let mut fline = 0;
         let mut fcol = 0;
         loop {
-            if self.finished_parsing() {
-                return;
-            } else if self.peek_eof() || self.peek_rightp() {
+            if self.peek_eof() || self.peek_rightp() {
                 let (line, col) = self.peek_line_col();
                 self.push_error(aline, acol, "start of unfinished array".to_owned());
                 self.push_error(line, col, "ERROR: unfinished array".to_owned());
@@ -623,8 +619,8 @@ impl Parser {
                         _ => {}
                     }
 
-                    self.parse_expression(None);
-                    if self.has_parsing_error() {
+                    self.parse_expression(false, None);
+                    if self.parsing_failed() {
                         return;
                     }
                     let value_node_index = self.cur_ast_node_index();
@@ -655,8 +651,8 @@ impl Parser {
                         },
                     }
                     self.nextt();
-                    self.parse_expression(None);
-                    if self.finished_parsing() {
+                    self.parse_expression(false, None);
+                    if self.parsing_failed() {
                         return;
                     }
                     self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.cur_ast_node_index()));
@@ -664,8 +660,8 @@ impl Parser {
                 } else {
                     let (line, col) = self.peek_line_col();
 
-                    self.parse_expression(None);
-                    if self.finished_parsing() {
+                    self.parse_expression(false, None);
+                    if self.parsing_failed() {
                         return;
                     }
 
@@ -698,12 +694,10 @@ impl Parser {
             self.push_error(line, col, "ERROR: expected condition after 'if'".to_owned());
             return;
         }
-        if self.finished_parsing() {
-            return;
-        }
+
         let if_idx = self.index;
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
         let cond_idx = self.cur_ast_node_index();
@@ -713,8 +707,8 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
         let expr_idx = self.cur_ast_node_index();
@@ -730,13 +724,10 @@ impl Parser {
             self.push_error(line, col, "ERROR: expected target after 'set'".to_owned());
             return;
         }
-        if self.finished_parsing() {
-            return;
-        }
 
         let set_idx = self.index;
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
 
@@ -747,8 +738,8 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'set'".to_owned());
             return;
         }
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
         let expr_idx = self.cur_ast_node_index();
@@ -761,12 +752,10 @@ impl Parser {
             self.push_error(line, col, "ERROR: expected expression after 'do'".to_owned());
             return;
         }
-        if self.finished_parsing() {
-            return;
-        }
+
         let do_idx = self.index;
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
         let expr1_idx = self.cur_ast_node_index();
@@ -778,11 +767,9 @@ impl Parser {
             self.push_error(line, col, "this do is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'do'".to_owned());
             return;
-        } else if self.finished_parsing() {
-            return;
         } else {
-            self.parse_expression(None);
-            if self.finished_parsing() {
+            self.parse_expression(false, None);
+            if self.parsing_failed() {
                 return;
             }
         }
@@ -796,12 +783,10 @@ impl Parser {
             self.push_error(line, col, "ERROR: expected condition after 'ife'".to_owned());
             return;
         }
-        if self.finished_parsing() {
-            return;
-        }
+
         let if_idx = self.index;
-        self.parse_expression(None);
-        if self.finished_parsing() {
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
         let cond_idx = self.cur_ast_node_index();
@@ -811,10 +796,12 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected success expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression(None);
-        if self.finished_parsing() {
+
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
+
         let expr_idx = self.cur_ast_node_index();
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
@@ -822,24 +809,23 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression(None);
-        if self.finished_parsing() {
+
+        self.parse_expression(false, None);
+        if self.parsing_failed() {
             return;
         }
+
         let expr2_idx = self.cur_ast_node_index();
         self.ast.push(AstNode::IfElse(if_idx, cond_idx, expr_idx, expr2_idx));
     }
 
-    fn parse_let(&mut self) {
+    fn parse_let(&mut self, code_block: bool) {
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
             self.push_error(line, col, "ERROR: expected identifier after 'let'".to_owned());
             return;
         }
         
-        if self.finished_parsing() {
-            return;
-        }
         let let_idx = self.index;
         
         let ref token = self.nextt().clone();
@@ -854,8 +840,8 @@ impl Parser {
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
-                    self.parse_expression(Some(&var_name));
-                    if self.finished_parsing() {
+                    self.parse_expression(false, Some(&var_name));
+                    if self.parsing_failed() {
                         return;
                     }
                     let def_idx = self.cur_ast_node_index();
@@ -877,12 +863,17 @@ impl Parser {
                         }
                     };
 
-                    self.parse_expression(None);
-                    self.pop_env_entry();
-
-                    if self.finished_parsing() {
+                    self.parse_expression(code_block, None);
+                    if self.parsing_failed() {
                         return;
                     }
+
+                    if code_block {
+                        self.block_var_count += 1;
+                    } else {
+                        self.pop_env_entry();
+                    }
+
                     let expr_idx = self.cur_ast_node_index();
                     self.ast.push(AstNode::Let(let_idx, var_name.to_owned(), def_idx, expr_idx));
                 }
@@ -892,7 +883,6 @@ impl Parser {
             }
         };
     }
-
 
     fn parse_func_call(&mut self, name:String) {
         let (line, col) = self.cur_line_col();
@@ -912,9 +902,9 @@ impl Parser {
                         }
 
                         let (aline, acol) = self.peek_line_col();
-                        self.parse_expression(None);
+                        self.parse_expression(false, None);
 
-                        if self.finished_parsing() {
+                        if self.parsing_failed() {
                             return;
                         }
 
@@ -997,17 +987,19 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(None);
+        self.parse_expression(false, None);
 
-        if self.has_parsing_error() {
+        if self.parsing_failed() {
             return;
         }
 
         self.ast.push(AstNode::StaticKeyAccess(key_name_idx, key_name, self.cur_ast_node_index()));
     }
 
-    fn parse_expression(&mut self, var_name: Option<&str>) {
-        // var_name is the name of the variable this expression will be assigned to;
+    fn parse_expression(&mut self, code_block: bool, var_name: Option<&str>) {
+        // - code_block is true if the expression makes variables declarations part of a multi
+        // expression code block
+        // - var_name is the name of the variable this expression will be assigned to;
         // used to handle recursion
         let dot_after_token = self.peek2_dot();
         let ref token = self.nextt();
@@ -1016,98 +1008,21 @@ impl Parser {
                 let _string = string.to_owned();
                 self.ast.push(AstNode::String(self.index, _string));
             },
-            Token {value: TokenValue::Number(num, unit), ..} => {
-                let mut _num = num.to_owned();
-                let _unit = unit.to_owned();
-                match _unit.as_deref() {
-                    None => {},
-                    Some("pi") => {_num *= 3.141592653589793},
-                    Some("sqrt2") => {_num *= 1.414213562373095},
-                    Some("sqrt0.5") => {_num *= 0.7071067811865476},
-                    Some("sqrt2pi") => {_num *= 2.50662827463100050241576528481104525},
-                    // this is kind of confusing with 10e 5 looks like 10 exponent 5
-                    //Some("e") => {_num *= 2.718281828459045},
-                    Some("ln2") => {_num *= 0.69314718056},
-                    Some("ln10") => {_num *= 2.30258509299},
-                    Some("log10e") => {_num *= 0.4342944819032518},
-                    Some("log2e") => {_num *= 1.4426950408889634},
-                    Some("phi") => {_num *= 1.618033988749894},
-                    Some("GT") => {_num *= 1000000000000.0},
-                    Some("MT") => {_num *= 1000000000.0},
-                    Some("kT") => {_num *= 1000000.0},
-                    Some("T") => {_num *= 1000.0},
-                    Some("kg") => {},
-                    Some("g") => {_num *= 0.001},
-                    Some("mg") => {_num *= 0.000001},
-                    Some("ug") => {_num *= 0.000000001},
-                    Some("ng") => {_num *= 0.000000000001},
-                    Some("Ti") => {_num *= 1024.0 * 1024.0 * 1024.0 * 1024.0},
-                    Some("Gi") => {_num *= 1024.0 * 1024.0 * 1024.0},
-                    Some("Mi") => {_num *= 1024.0 * 1024.0},
-                    Some("ki") => {_num *= 1024.0},
-                    Some("d") => {_num *= 60.0 * 60.0 * 24.0},
-                    Some("h") => {_num *= 60.0 * 60.0},
-                    Some("min") => {_num *= 60.0},
-                    Some("s") => {},
-                    Some("ms") => {_num *= 0.001},
-                    Some("us") => {_num *= 0.000001},
-                    Some("ns") => {_num *= 0.000000001},
-                    Some("deg") => {_num *= std::f64::consts::PI / 180.0},
-                    Some("rad") => {},
-                    Some("in") => {_num *= 0.024},
-                    Some("km") => {_num *= 1000.0},
-                    Some("m") => {},
-                    Some("dm") => {_num *= 0.1},
-                    Some("cm") => {_num *= 0.01},
-                    Some("mm") => {_num *= 0.001},
-                    Some("um") => {_num *= 0.000001},
-                    Some("nm") => {_num *= 0.000000001},
-                    Some("lb") => {_num *= 0.453592},
-                    Some("oz") => {_num *= 0.0283495},
-                    Some("mile") => {_num *= 1609.34},
-                    Some("miles") => {_num *= 1609.34},
-                    Some("ft") => {_num *= 0.3048},
-                    Some("yd") => {_num *= 0.9144},
-                    Some("F") => {_num = ((_num - 32.0) * 5.0 / 9.0) + 273.15},
-                    Some("C") => {_num = _num + 273.15},
-                    Some("K") => {},
-                    Some("m3") => {},
-                    Some("l") => {_num *= 0.0001},
-                    Some("dm3") => {_num *= 0.0001},
-                    Some("dl") => {_num *= 0.00001},
-                    Some("cl") => {_num *= 0.000001},
-                    Some("ml") => {_num *= 0.0000001},
-                    Some("cm3") => {_num *= 0.0000001},
-                    Some("barrel") => {_num *= 0.158987294928},
-                    Some("cu.ft") => {_num *= 0.028},
-                    Some("ft3") => {_num *= 0.028},
-                    Some("gal") => {_num *= 0.003785411784},
-                    Some("pint") => {_num *= 0.000473176473},
-                    Some("cu.in") => {_num *= 0.000016387064},
-                    Some("in3") => {_num *= 0.000016387064},
-                    Some("cu.yd") => {_num *= 0.7645549},
-                    Some("yd3") => {_num *= 0.7645549},
-                    Some("m2") => {},
-                    Some("dm2") => {_num *= 0.01},
-                    Some("cm2") => {_num *= 0.0001},
-                    Some("mm2") => {_num *= 0.000001},
-                    Some("a") => {_num *= 100.0},
-                    Some("ha") => {_num *= 100000.0},
-                    Some("km2") => {_num *= 1000000.0},
-                    Some("mile2") => {_num *= 2589975.23456},
-                    Some("yd2") => {_num *= 0.836127},
-                    Some("sq.yd") => {_num *= 0.836127},
-                    Some("ft2") => {_num *= 0.092903},
-                    Some("sq.ft") => {_num *= 0.092903},
-                    Some("in2") => {_num *= 0.00064516},
-                    Some("sq.in") => {_num *= 0.00064516},
-                    _ => {
+            Token {value: TokenValue::Number(num, None), ..} => {
+                let _num = num.to_owned();
+                self.ast.push(AstNode::Number(self.index, _num));
+            },
+            Token {value: TokenValue::Number(num, Some(unit)), ..} => {
+                let _num = convert_unit_to_si(*num, unit);
+                match _num {
+                    Some(__num) => {
+                        self.ast.push(AstNode::Number(self.index, __num));
+                    }
+                    None => {
                         let (line, col) = self.cur_line_col();
                         self.push_error(line, col, "ERROR: unknown unit".to_owned());
-                        return;
                     }
-                }
-                self.ast.push(AstNode::Number(self.index, _num));
+                };
             },
             Token {value: TokenValue::Name(ref name, ..), ..} => {
                 if dot_after_token {
@@ -1122,7 +1037,7 @@ impl Parser {
                 } else if name == "void" || name == "_" || name == "end" {
                     self.ast.push(AstNode::Void(self.index));
                 } else if name == "let" {
-                    self.parse_let();
+                    self.parse_let(code_block);
                 } else if name == "set" {
                     self.parse_set();
                 } else if name == "if" {
@@ -1138,8 +1053,8 @@ impl Parser {
             },
             Token {value: TokenValue::Bang, ..} => {
                 let bang_index = self.index;
-                self.parse_expression(None);
-                if self.finished_parsing() {
+                self.parse_expression(false, None);
+                if self.parsing_failed() {
                     return;
                 }
                 self.ast.push(AstNode::Error(bang_index, self.cur_ast_node_index()));
@@ -1151,8 +1066,8 @@ impl Parser {
                     self.nextt();
                     return;
                 }
-                self.parse_expression(var_name);
-                if self.finished_parsing() {
+                self.parse_expression(false, var_name);
+                if self.parsing_failed() {
                     return;
                 }
                 if !self.peek_rightp() {
@@ -1177,6 +1092,36 @@ impl Parser {
                 let (line, col) = self.cur_line_col();
                 self.push_error(line, col, "ERROR: unexpected token".to_owned());
             }
+        }
+    }
+
+    fn parse_code_block(&mut self) {
+        let mut expressions_indexes:Vec<usize> = vec![];
+        let code_block_token_index = self.index;
+
+        let cur_block_var_count = self.block_var_count;
+
+        loop {
+            if self.peek_eof() {
+                break;
+            }
+
+            self.parse_expression(true, None);
+            if self.parsing_failed() {
+                return;
+            }
+
+            expressions_indexes.push(self.cur_ast_node_index())
+        }
+
+        for _ in cur_block_var_count..self.block_var_count {
+            self.pop_env_entry();
+        }
+
+        self.block_var_count = cur_block_var_count;
+
+        if expressions_indexes.len() >= 2 {
+            self.ast.push(AstNode::CodeBlock(code_block_token_index, expressions_indexes));
         }
     }
 
@@ -1212,9 +1157,11 @@ impl Parser {
 
         // |a|
         for name in vec![
-            "print", "range", "not", "decr", "incr", "increment",
+            "range", "decr", "incr", "increment",
             "sin", "cos", "tan", "inv", "/max", "/min", "/and",
-            "/or", "/eq", "/add", "/mult", "len", "neg", "return"
+            "/or", "/eq", "/add", "/mult", "len",
+            // implemented
+            "num", "print", "neg", "return", "not", "bool"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
@@ -1242,9 +1189,9 @@ impl Parser {
 
     pub fn parse(&mut self) {
         println!("tokenize...");
-        self.tokenizer.tokenize();
 
-        if self.tokenizer.state != TokenizerState::Done {
+        self.tokenizer.tokenize();
+        if self.tokenizer.failed() {
             return;
         }
 
@@ -1252,19 +1199,9 @@ impl Parser {
 
         println!("build ast...");
 
-        if self.peek_eof() {
-            self.state = ParserState::Done;
-            return;
-        }
+        self.parse_code_block();
 
-        self.parse_expression(None);
-
-        if self.has_parsing_error() {
-            return;
-        } else if !self.peek_eof() {
-            let (line, col) = self.peek_line_col();
-            self.push_error(line, col, "ERROR: a nope file should be a single expression".to_owned());
-        } else {
+        if !self.parsing_failed() {
             self.state = ParserState::Done;
         }
     }
@@ -2281,8 +2218,44 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_multi_expr() {
+    fn test_parse_code_block() {
         let mut parser = Parser::new(String::from("print 3.14 print 4.92"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.14),
+            AstNode::FunctionCall(1, "print".to_owned(), vec![0]),
+            AstNode::Number(3, 4.92),
+            AstNode::FunctionCall(3, "print".to_owned(), vec![2]),
+            AstNode::CodeBlock(0, vec![1, 3])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_code_block_env_carry_over() {
+        let mut parser = Parser::new(String::from("let a 3 _ print a"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 3.0),
+            AstNode::Void(3),
+            AstNode::Let(0, "a".to_owned(), 0, 1),
+            AstNode::ValueReference(5, "a".to_owned()),
+            AstNode::FunctionCall(5, "print".to_owned(), vec![3]),
+            AstNode::CodeBlock(0, vec![2, 4])
+        ]);
+    }
+
+    #[test]
+    fn test_parse_code_block_env_carry_over2() {
+        let mut parser = Parser::new(String::from("let a 3 let b 4 _ add a b"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_code_block_env_carry_over_wrong() {
+        let mut parser = Parser::new(String::from("if true let a 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }

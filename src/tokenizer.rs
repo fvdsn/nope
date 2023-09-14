@@ -149,6 +149,10 @@ impl Tokenizer {
         return self.chars[self.index];
     }
 
+    pub fn failed(&self) -> bool{
+        return matches!(self.state, TokenizerState::Error(_));
+    }
+
     fn peek1(&self) -> char {
         if self.nextindex >= self.chars.len() {
             return '\0';

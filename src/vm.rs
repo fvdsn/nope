@@ -1,10 +1,26 @@
 use rand::Rng;
 use crate::parser::Parser;
 use crate::parser::AstNode;
+use std::time::SystemTime;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum Value {
+    Null,
+    Void,
+    Boolean(bool),
     Num(f64),
+}
+
+impl Value {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Value::Null => false,
+            Value::Void => false,
+            Value::Boolean(value) => *value,
+            Value::Num(num) => *num != 0.0,
+            // _ => true,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -18,6 +34,9 @@ enum OpCode {
     Divide,
     Random,
     Print,
+    Num,
+    Not,
+    Bool,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -97,6 +116,9 @@ impl Vm {
     fn print_val(&self, val: &Value) {
         match val {
             Value::Num(num) => { println!("{}", num); }
+            Value::Null => { println!("null"); }
+            Value::Void => { println!("_"); }
+            Value::Boolean(val)=> { if *val { println!("true"); } else { println!("false")} }
         }
     }
 
@@ -106,7 +128,7 @@ impl Vm {
 
         parser.parse();
 
-        if parser.has_errors() {
+        if parser.failed() {
             parser.print_errors();
             return InterpretResult::CompileError;
         }
@@ -119,13 +141,35 @@ impl Vm {
         }
 
         println!("run...\n");
-        return self.run();
+        
+        let now = SystemTime::now();
+        let res = self.run();
+
+        match now.elapsed() {
+            Ok(elapsed) => {
+                println!("\n Ran in {}s", elapsed.as_secs());
+            }
+            _ => {
+                println!("wtf");
+            }
+        };
+
+        return res;
     }
 
     fn compile_node(&mut self, ast: &Vec<AstNode>, node_idx: usize) -> bool {
         match &ast[node_idx] {
             AstNode::Number(_, num) => {
                 self.chunk.push_constant(node_idx, Value::Num(*num));
+            },
+            AstNode::Null(_) => {
+                self.chunk.push_constant(node_idx, Value::Null);
+            },
+            AstNode::Void(_) => {
+                self.chunk.push_constant(node_idx, Value::Void);
+            },
+            AstNode::Boolean(_, val) => {
+                self.chunk.push_constant(node_idx, Value::Boolean(*val));
             },
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
@@ -142,6 +186,9 @@ impl Vm {
                     "neg" => { self.chunk.push_op(node_idx, OpCode::Negate) },
                     "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
                     "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
+                    "num" => { self.chunk.push_op(node_idx, OpCode::Num) },
+                    "not" => { self.chunk.push_op(node_idx, OpCode::Not) },
+                    "bool" => { self.chunk.push_op(node_idx, OpCode::Bool) },
                     _ => { 
                         println!("unknown function {}", name);
                         return false; 
@@ -183,20 +230,55 @@ impl Vm {
                     let cst = self.chunk.constants[cst_idx];
                     self.push(cst);
                 },
+                OpCode::Num => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(*num));
+                        },
+                        Value::Null => {
+                            self.push(Value::Num(0.0));
+                        }
+                        Value::Void => {
+                            self.push(Value::Num(0.0));
+                        }
+                        Value::Boolean(val)=> {
+                            if *val {
+                                self.push(Value::Num(1.0));
+                            } else {
+                                self.push(Value::Num(0.0));
+                            }
+                        }
+                    }
+                },
                 OpCode::Negate => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
                             self.push(Value::Num(-num));
-                        }
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        },
                     }
+                },
+                OpCode::Not => {
+                    let val = self.pop();
+                    self.push(Value::Boolean(!val.is_truthy()));
+                },
+                OpCode::Bool => {
+                    let val = self.pop();
+                    self.push(Value::Boolean(val.is_truthy()));
                 },
                 OpCode::Add => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a + val_b));
-                        }
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        },
                     }
                 },
                 OpCode::Substract => {
@@ -205,6 +287,9 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a - val_b));
                         }
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        },
                     }
                 },
                 OpCode::Multiply => {
@@ -213,6 +298,9 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a * val_b));
                         }
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        },
                     }
                 },
                 OpCode::Divide => {
@@ -221,6 +309,9 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a / val_b));
                         }
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        },
                     }
                 },
                 OpCode::Random => {
