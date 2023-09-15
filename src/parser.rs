@@ -109,7 +109,7 @@ impl Parser {
 
     fn _pretty_print_ast (&self, index:usize, indent:usize, noindent:bool) {
         let original_indent = if noindent {0} else {indent};
-        let ref node = &self.ast[index];
+        let node = &self.ast[index];
         match node {
             AstNode::Number(_, num) => {
                 println!("{}{}", " ".repeat(original_indent), num);
@@ -206,7 +206,7 @@ impl Parser {
     }
 
     fn _pretty_print_error_line(&self, line:usize, col:usize, message: &String) {
-        println!("");
+        println!();
         let lines: Vec<&str> = self.tokenizer.source.lines().collect();
         let lineidx = line - 1;
         if lineidx >= 1 {
@@ -221,7 +221,7 @@ impl Parser {
                 break;
             } else {
                 print!("-");
-                i = i + 1;
+                i += 1;
             }
         }
         println!("line: {}, col: {} // {}", line, col, message);
@@ -232,14 +232,10 @@ impl Parser {
     }
 
     pub fn print_errors(&self) {
-        let ref tokenizer_state = self.tokenizer.state;
-        match tokenizer_state {
-            TokenizerState::Error(message) => {
-                self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
-                return;
-            },
-            _ => {},
-        };
+        if let TokenizerState::Error(message) = &self.tokenizer.state {
+            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
+            return;
+        }
         if self.parsing_failed() {
             for error in &self.errors {
                 self._pretty_print_error_line(error.line, error.col, &error.message);
@@ -249,27 +245,23 @@ impl Parser {
     }
 
     pub fn pretty_print(&self) {
-        let ref tokenizer_state = self.tokenizer.state;
-        match tokenizer_state {
-            TokenizerState::Error(message) => {
-                self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
-                return;
-            },
-            _ => {},
-        };
+        if let TokenizerState::Error(message) = &self.tokenizer.state {
+            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
+            return;
+        }
         if self.parsing_failed() {
             for error in &self.errors {
                 self._pretty_print_error_line(error.line, error.col, &error.message);
             }
             return;
         }
-        if self.ast.len() > 0 {
+        if !self.ast.is_empty() {
             self._pretty_print_ast(self.cur_ast_node_index(), 0, false);
         }
     }
 
     fn nextt(&mut self) -> &Token {
-        assert!(self.tokenizer.tokens.len() > 0);
+        assert!(!self.tokenizer.tokens.is_empty());
         if self.nextindex >= self.tokenizer.tokens.len() {
             return &self.tokenizer.tokens[self.nextindex-1];
         } else {
@@ -281,7 +273,7 @@ impl Parser {
 
     fn peekt(&self) -> &Token {
         let tokens = &self.tokenizer.tokens;
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
         if self.nextindex >= self.tokenizer.tokens.len() {
             return &tokens[tokens.len()-1]; // should return Eof
         } else {
@@ -291,7 +283,7 @@ impl Parser {
 
     fn peek2t(&self) -> &Token {
         let tokens = &self.tokenizer.tokens;
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
         if self.nextindex + 1 >= self.tokenizer.tokens.len() {
             return &tokens[tokens.len()-1]; // should return Eof
         } else {
@@ -300,7 +292,7 @@ impl Parser {
     }
 
     fn peek_eof(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         match token {
             Token {value: TokenValue::Eof, ..} => {
                 return true;
@@ -312,7 +304,7 @@ impl Parser {
     }
 
     fn peek_closing_element(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         match token {
             Token {value: TokenValue::Eof, ..} => {
                 return true;
@@ -330,66 +322,66 @@ impl Parser {
     }
 
     fn peek_rsqbrkt(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return matches!(token.value, TokenValue::RightSqBrkt);
     }
 
     fn peek_rightp(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return matches!(token.value, TokenValue::RightP);
     }
 
     fn peek_swp(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return matches!(token.value, TokenValue::Swp);
     }
 
     fn peek_comma(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return matches!(token.value, TokenValue::Comma);
     }
 
     fn peek_colon(&self) -> bool {
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return matches!(token.value, TokenValue::Colon);
     }
 
     fn peek2_colon(&self) -> bool {
-        let ref token = self.peek2t();
+        let token = &self.peek2t();
         return matches!(token.value, TokenValue::Colon);
     }
 
     fn peek2_dot(&self) -> bool {
-        let ref token = self.peek2t();
+        let token = &self.peek2t();
         return matches!(token.value, TokenValue::Dot);
     }
 
     fn cur_line_col(&self) ->  (usize, usize){
-        let ref token = self.tokenizer.tokens[self.index];
+        let token = &self.tokenizer.tokens[self.index];
         return (token.line, token.col);
     }
 
     fn peek_line_col(&self) ->  (usize, usize){
-        let ref token = self.peekt();
+        let token = &self.peekt();
         return (token.line, token.col);
     }
 
     fn push_error(&mut self, line: usize, col: usize, message: String) {
         self.state = ParserState::Error;
         self.errors.push(
-            ParserError { line: line, col: col, message: message }
+            ParserError { line, col, message }
         );
     }
 
     fn push_env_value_entry(&mut self, name: String) {
-        self.env.push(EnvEntry { name:name, is_func:false, func_args:vec![] });
+        self.env.push(EnvEntry { name, is_func:false, func_args:vec![] });
     }
 
     fn push_env_func_entry(&mut self, name: String, args: Vec<FunctionArg>) {
         if name == "_" {    // _ must keep having the void value
-            self.env.push(EnvEntry { name:name, is_func:false, func_args:vec![] });
+            self.env.push(EnvEntry { name, is_func:false, func_args:vec![] });
         } else {
-            self.env.push(EnvEntry { name:name, is_func:true, func_args:args });
+            self.env.push(EnvEntry { name, is_func:true, func_args:args });
         }
     }
 
@@ -397,12 +389,12 @@ impl Parser {
         let mut func_args: Vec<FunctionArg> = vec![];
         for i in 0..argc {
             func_args.push(FunctionArg {
-                name: String::from(format!("arg{}",i+1)),
+                name: format!("arg{}",i+1),
                 is_func: false,
                 func_arity: 0,
             });
         }
-        self.env.push(EnvEntry { name:name, is_func:true, func_args:func_args});
+        self.env.push(EnvEntry { name, is_func:true, func_args });
     }
 
     fn pop_env_entry(&mut self) {
@@ -410,12 +402,12 @@ impl Parser {
     }
 
     fn get_env_entry(&self, name: &String) -> Option<EnvEntry> {
-        if self.env.len() == 0 {
+        if self.env.is_empty() {
             return None;
         }
         let mut i = self.env.len() - 1;
         loop {
-            let ref entry = self.env[i];
+            let entry = &self.env[i];
             if entry.name == *name {
                 let _entry: EnvEntry = entry.clone();
                 return Some(_entry);
@@ -430,7 +422,7 @@ impl Parser {
     }
     
     fn cur_ast_node_index(&self) -> usize {
-        if self.ast.len() == 0 {
+        if self.ast.is_empty() {
             panic!("should not happen");
         } else {
             return self.ast.len() - 1;
@@ -438,7 +430,7 @@ impl Parser {
     }
 
     fn cur_ast_node(&self) -> &AstNode{
-        if self.ast.len() == 0 {
+        if self.ast.is_empty() {
             panic!("should not happen");
         } else {
             return &self.ast[self.ast.len() - 1];
@@ -469,7 +461,7 @@ impl Parser {
                 self.push_error(line, col, "ERROR: missing | to close the function argument list".to_owned());
                 return;
             }
-            let ref argname_token = self.nextt().clone();
+            let argname_token = &self.nextt().clone();
             let (line, col) = self.cur_line_col();
             match argname_token {
                 Token {value: TokenValue::Name(ref name, ..), ..} => {
@@ -492,7 +484,7 @@ impl Parser {
                             self.push_error(line, col, "ERROR: missing function argument argcount".to_owned());
                             return;
                         }
-                        let ref argcount_token = self.nextt().clone();
+                        let argcount_token = &self.nextt().clone();
                         let (line, col) = self.cur_line_col();
                         match argcount_token { // parsing the 'n' of |arg:n|
                             Token {value: TokenValue::Number(num, unit), ..} => {
@@ -516,7 +508,7 @@ impl Parser {
 
                     func_args.push(FunctionArg {
                         name:name.to_owned(),
-                        is_func:is_func,
+                        is_func,
                         func_arity:argc,
                     });
                 },
@@ -539,12 +531,9 @@ impl Parser {
 
         // if we have a name for the function, push a reference to it in the environment
         // to allow recursion
-        match func_name {
-            Some(name) => {
-                self.push_env_func_entry(name.to_string(), func_args.clone());
-            }
-            None => {}
-        };
+        if let Some(name) = func_name {
+            self.push_env_func_entry(name.to_string(), func_args.clone());
+        }
 
         // create an environment entry for each function argument
         for arg in &func_args {
@@ -564,13 +553,9 @@ impl Parser {
             self.pop_env_entry();
         }
 
-        match func_name {
-            Some(_) => {
-                self.pop_env_entry();
-            }
-            None => {}
-        };
-
+        if func_name.is_some() {
+            self.pop_env_entry();
+        }
 
         self.ast.push(AstNode::FunctionDef(func_token_index, func_args, self.cur_ast_node_index()));
     }
@@ -610,13 +595,10 @@ impl Parser {
                     
                     let ast_node = self.cur_ast_node();
 
-                    match ast_node {
-                        AstNode::FunctionDef(_, args, _) => {
-                            if args.len() != 2 {
-                                self.push_error(aline, acol, "ERROR filter function must have 2 arguments (key, value)".to_owned());
-                            }
-                        }, 
-                        _ => {}
+                    if let AstNode::FunctionDef(_, args, _) = ast_node {
+                        if args.len() != 2 {
+                            self.push_error(aline, acol, "ERROR filter function must have 2 arguments (key, value)".to_owned());
+                        }
                     }
 
                     self.parse_expression(false, None);
@@ -627,58 +609,52 @@ impl Parser {
                     self.ast.push(AstNode::DynamicKeyAccess(array_token_index, key_node_index, value_node_index));
                     return;
                 }
-            } else {
-                if self.peek2_colon() {
-                    self.nextt();
-                    let keytoken_index = self.index;
-                    let keytoken = &self.tokenizer.tokens[self.index];
-                    let keystr:String;
-                    match keytoken {
-                        Token {value: TokenValue::String(ref string, ..), ..} => {
-                            keystr = string.to_owned();
-                        },
-                        Token {value: TokenValue::Name(ref string, ..), ..} => {
-                            keystr = string.to_owned();
-                        },
-                        Token {value: TokenValue::Number(num, ..), ..} => {
-                            keystr = num.to_string();
-                        },
-                        _ => {
-                            let (line, col) = self.cur_line_col();
-                            self.push_error(aline, acol, "array with invalid key".to_owned());
-                            self.push_error(line, col, "ERROR: invalid key definition".to_owned());
-                            return;
-                        },
-                    }
-                    self.nextt();
-                    self.parse_expression(false, None);
-                    if self.parsing_failed() {
+            } else if self.peek2_colon() {
+                self.nextt();
+                let keytoken_index = self.index;
+                let keytoken = &self.tokenizer.tokens[self.index];
+                let keystr:String = match keytoken {
+                    Token {value: TokenValue::String(ref string, ..), ..} => {
+                        string.to_owned()
+                    },
+                    Token {value: TokenValue::Name(ref string, ..), ..} => {
+                        string.to_owned()
+                    },
+                    Token {value: TokenValue::Number(num, ..), ..} => {
+                        num.to_string()
+                    },
+                    _ => {
+                        let (line, col) = self.cur_line_col();
+                        self.push_error(aline, acol, "array with invalid key".to_owned());
+                        self.push_error(line, col, "ERROR: invalid key definition".to_owned());
                         return;
-                    }
-                    self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.cur_ast_node_index()));
-                    value_node_indexes.push(self.cur_ast_node_index())
-                } else {
-                    let (line, col) = self.peek_line_col();
-
-                    self.parse_expression(false, None);
-                    if self.parsing_failed() {
-                        return;
-                    }
-
-                    let ast_node = self.cur_ast_node();
-
-                    match ast_node {
-                        AstNode::FunctionDef(_, _, _) => {
-                            if !has_func_val {
-                                has_func_val = true;
-                                fline = line;
-                                fcol = col;
-                            }
-                        }, 
-                        _ => {}
-                    }
-                    value_node_indexes.push(self.cur_ast_node_index()) // put the index of the last parsed astnode
+                    },
+                };
+                self.nextt();
+                self.parse_expression(false, None);
+                if self.parsing_failed() {
+                    return;
                 }
+                self.ast.push(AstNode::KeyValue(keytoken_index, keystr, self.cur_ast_node_index()));
+                value_node_indexes.push(self.cur_ast_node_index())
+            } else {
+                let (line, col) = self.peek_line_col();
+
+                self.parse_expression(false, None);
+                if self.parsing_failed() {
+                    return;
+                }
+
+                let ast_node = self.cur_ast_node();
+
+                if let AstNode::FunctionDef(_, _, _) = ast_node {
+                    if !has_func_val {
+                        has_func_val = true;
+                        fline = line;
+                        fcol = col;
+                    }
+                }
+                value_node_indexes.push(self.cur_ast_node_index()) // put the index of the last parsed astnode
             }
         }
     }
@@ -828,7 +804,7 @@ impl Parser {
         
         let let_idx = self.index;
         
-        let ref token = self.nextt().clone();
+        let token = &self.nextt().clone();
         match token {
             Token {value: TokenValue::Name(ref var_name, ..), ..} => {
                 if is_reserved_keyword(var_name) {
@@ -840,7 +816,7 @@ impl Parser {
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
-                    self.parse_expression(false, Some(&var_name));
+                    self.parse_expression(false, Some(var_name));
                     if self.parsing_failed() {
                         return;
                     }
@@ -852,7 +828,7 @@ impl Parser {
                         return;
                     }
 
-                    let ref value_node = self.cur_ast_node();
+                    let value_node = &self.cur_ast_node();
 
                     match value_node {
                         AstNode::FunctionDef(_, args,_) => {
@@ -917,10 +893,10 @@ impl Parser {
                                         self.push_error(line, col, "this function call has an argument type error".to_owned());
                                         self.push_error(
                                             aline, acol,
-                                            String::from(format!(
+                                            format!(
                                                 "ERROR: expected a function with {} arguments instead of {}",
                                                 arg.func_arity, args.len()
-                                            ))
+                                            )
                                         );
                                         return;
                                     }
@@ -929,9 +905,9 @@ impl Parser {
                                     self.push_error(line, col, "this function call has an argument type error".to_owned());
                                     self.push_error(
                                         aline, acol,
-                                        String::from(format!(
+                                        format!(
                                             "ERROR: expected a function with {} arguments", arg.func_arity
-                                        ))
+                                        )
                                     );
                                     return;
                                 }
@@ -978,7 +954,7 @@ impl Parser {
 
         let key_name_idx = self.index;
 
-        let ref _dot = self.nextt();
+        let _dot = &self.nextt();
 
         let (dline, dcol) = self.cur_line_col();  // line col of the dot
 
@@ -1002,7 +978,7 @@ impl Parser {
         // - var_name is the name of the variable this expression will be assigned to;
         // used to handle recursion
         let dot_after_token = self.peek2_dot();
-        let ref token = self.nextt();
+        let token = &self.nextt();
         match token {
             Token {value: TokenValue::String(ref string, ..), ..} => {
                 let _string = string.to_owned();
@@ -1137,7 +1113,7 @@ impl Parser {
         );
 
         // |f:2 a|
-        for name in vec!["map", "filter"] {
+        for name in ["map", "filter"] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
                     func_args: vec![
@@ -1149,14 +1125,14 @@ impl Parser {
         }
         
         // ||
-        for name in vec!["random"] {
+        for name in ["random", "coinflip"] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
             );
         }
 
         // |a|
-        for name in vec![
+        for name in [
             "range", "decr", "incr", "increment",
             "sin", "cos", "tan", "inv", "/max", "/min", "/and",
             "/or", "/eq", "/add", "/mult", "len",
@@ -1174,7 +1150,9 @@ impl Parser {
         // |a b|
         for name in vec![
             "and", "or", "eq", "neq", "add", "sub", "mod", "mult",
-            "div", "exp", "<", ">", "<=", ">=", "==", "max", "min"
+            "div", "exp", "max", "min",
+            //implemented
+            "<", "<=", ">", ">=", "==", "~=", "!=", "!~=",
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 

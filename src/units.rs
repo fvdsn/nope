@@ -1,15 +1,17 @@
+use std::f64;
+
 pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
     match unit {
-        "pi" => {num *= 3.141592653589793},
-        "sqrt2" => {num *= 1.414213562373095},
-        "sqrt0.5" => {num *= 0.7071067811865476},
-        "sqrt2pi" => {num *= 2.50662827463100050241576528481104525},
+        "pi" => {num *= f64::consts::PI},
+        "sqrt2" => {num *= f64::consts::SQRT_2},
+        "sqrt0.5" => {num *= f64::consts::FRAC_1_SQRT_2},
+        "sqrt2pi" => {num *= 2.506_628_274_631_000_7},
         // this is kind of confusing with 10e 5 looks like 10 exponent 5
         //"e" => {num *= 2.718281828459045},
-        "ln2" => {num *= 0.69314718056},
-        "ln10" => {num *= 2.30258509299},
-        "log10e" => {num *= 0.4342944819032518},
-        "log2e" => {num *= 1.4426950408889634},
+        "ln2" => {num *= f64::consts::LN_2},
+        "ln10" => {num *= f64::consts::LN_10},
+        "log10e" => {num *= f64::consts::LOG10_E},
+        "log2e" => {num *= f64::consts::LOG2_E},
         "phi" => {num *= 1.618033988749894},
         "GT" => {num *= 1000000000000.0},
         "MT" => {num *= 1000000000.0},
@@ -48,7 +50,7 @@ pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
         "ft" => {num *= 0.3048},
         "yd" => {num *= 0.9144},
         "F" => {num = ((num - 32.0) * 5.0 / 9.0) + 273.15},
-        "C" => {num = num + 273.15},
+        "C" => {num += 273.15},
         "K" => {},
         "m3" => {},
         "l" => {num *= 0.0001},

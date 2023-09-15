@@ -79,7 +79,7 @@ fn is_namechar(c:char) -> bool {
 
 
 fn is_digit(c:char) -> bool {
-    return c.is_digit(10);
+    return c.is_ascii_digit();
 }
 
 fn is_alpha(c:char) -> bool {
@@ -88,7 +88,7 @@ fn is_alpha(c:char) -> bool {
 
 fn is_unit(c:char) -> bool {
     // kg, cm, m3, cu.in
-    return c.is_alphabetic() || c.is_digit(10) || c == '.';
+    return c.is_alphabetic() || c.is_ascii_digit() || c == '.';
 }
 
 impl Tokenizer {
@@ -99,7 +99,7 @@ impl Tokenizer {
             index: 0,
             nextindex: 0,
             chars: source.chars().collect(),
-            source: source,
+            source,
             tokens: Vec::new(),
             state: TokenizerState::Wip,
         };
@@ -171,10 +171,9 @@ impl Tokenizer {
                 }
             }
         }
-        if token.len() + self.index < self.chars.len() {
-            if is_namechar(self.chars[self.index + token.len()]) {
-                return false;
-            }
+        if token.len() + self.index < self.chars.len() &&
+           is_namechar(self.chars[self.index + token.len()]) {
+            return false;
         }
 
         self.push_token(value);
@@ -191,12 +190,12 @@ impl Tokenizer {
         self.tokens.push(Token {
             line: self.line,
             col: self.col,
-            value: value,
+            value,
         });
     }
 
     fn is_cur_rightsqbrkt(&self) -> bool {
-        if self.tokens.len() == 0 {
+        if self.tokens.is_empty() {
             return false;
         } else {
             return matches!(&self.tokens[self.tokens.len()-1], Token { value: TokenValue::RightSqBrkt, ..});
@@ -269,8 +268,8 @@ impl Tokenizer {
                     }
                 }
                 self.tokens.push(Token {
-                    line: line,
-                    col: col,
+                    line,
+                    col,
                     value: TokenValue::Comment(comment.iter().collect()),
                 });
 
@@ -337,9 +336,9 @@ impl Tokenizer {
                     let unitstr: String = unit.iter().collect();
                     match numstr.parse::<f64>() {
                         Ok(val) => self.tokens.push(Token {
-                            line: line,
-                            col: col,
-                            value: TokenValue::Number(val, if unitstr.len() > 0 { Some(unitstr) } else {None}),
+                            line,
+                            col,
+                            value: TokenValue::Number(val, if !unitstr.is_empty() { Some(unitstr) } else {None}),
                         }),
                         Err(e) => self.state = TokenizerState::Error(e.to_string())
                     }
@@ -359,8 +358,8 @@ impl Tokenizer {
                     str.push(self.nextc());
                 }
                 self.tokens.push(Token {
-                    line: line,
-                    col: col,
+                    line,
+                    col,
                     value: TokenValue::String(str.iter().collect()),
                 });
             } else if cur == '"' || cur == '\'' {
@@ -398,8 +397,8 @@ impl Tokenizer {
                 }
                 if !error {
                     self.tokens.push(Token {
-                        line: line,
-                        col: col,
+                        line,
+                        col,
                         value: TokenValue::String(str.iter().collect()),
                     });
                 }
@@ -418,8 +417,8 @@ impl Tokenizer {
                     }
                 }
                 self.tokens.push(Token {
-                    line: line,
-                    col: col,
+                    line,
+                    col,
                     value: TokenValue::Name(name.iter().collect()),
                 });
             }

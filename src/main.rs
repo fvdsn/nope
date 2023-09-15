@@ -1,3 +1,5 @@
+#![allow(clippy::needless_return)]
+
 use std::fs;
 use clap::{Arg, Command};
 
@@ -73,20 +75,20 @@ fn main() {
 
 
     if m.is_present("tokenize") {
-        let mut tokenizer = Tokenizer::new(String::from(source));
+        let mut tokenizer = Tokenizer::new(source);
         tokenizer.tokenize();
         tokenizer.print();
     } else if m.is_present("parse") {
-        let mut parser = Parser::new(String::from(source));
+        let mut parser = Parser::new(source);
         parser.parse();
         parser.tokenizer.print();
         parser.print();
     } else if m.is_present("ast") {
-        let mut parser = Parser::new(String::from(source));
+        let mut parser = Parser::new(source);
         parser.parse();
         parser.pretty_print();
     } else {
         let mut vm = Vm::new();
-        vm.interpret(String::from(source));
+        vm.interpret(source);
     }
 }

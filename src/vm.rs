@@ -21,6 +21,14 @@ impl Value {
             // _ => true,
         }
     }
+    pub fn num_equiv(&self) -> f64 {
+        match self {
+            Value::Null => 0.0,
+            Value::Void => 0.0,
+            Value::Boolean(value) => (*value as i32) as f64,
+            Value::Num(num) => *num,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -37,6 +45,12 @@ enum OpCode {
     Num,
     Not,
     Bool,
+    Equal,
+    Greater,
+    Less,
+    GreaterOrEqual,
+    LessOrEqual,
+    AlmostEqual,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -189,6 +203,16 @@ impl Vm {
                     "num" => { self.chunk.push_op(node_idx, OpCode::Num) },
                     "not" => { self.chunk.push_op(node_idx, OpCode::Not) },
                     "bool" => { self.chunk.push_op(node_idx, OpCode::Bool) },
+                    "==" => { self.chunk.push_op(node_idx, OpCode::Equal) },
+                    ">" => { self.chunk.push_op(node_idx, OpCode::Greater) },
+                    "<" => { self.chunk.push_op(node_idx, OpCode::Less) },
+                    ">=" => { self.chunk.push_op(node_idx, OpCode::GreaterOrEqual) },
+                    "<=" => { self.chunk.push_op(node_idx, OpCode::LessOrEqual) },
+                    "~=" => { self.chunk.push_op(node_idx, OpCode::AlmostEqual) },
+                    "!=" => { 
+                        self.chunk.push_op(node_idx, OpCode::Equal);
+                        self.chunk.push_op(node_idx, OpCode::Not);
+                    },
                     _ => { 
                         println!("unknown function {}", name);
                         return false; 
@@ -203,7 +227,7 @@ impl Vm {
     }
 
     pub fn compile(&mut self, ast: &Vec<AstNode>) -> bool {
-        if ast.len() > 0 {
+        if !ast.is_empty() {
             if !self.compile_node(ast, ast.len() - 1) {
                 return false;
             }
@@ -232,24 +256,7 @@ impl Vm {
                 },
                 OpCode::Num => {
                     let val = self.pop();
-                    match &val {
-                        Value::Num(num) => {
-                            self.push(Value::Num(*num));
-                        },
-                        Value::Null => {
-                            self.push(Value::Num(0.0));
-                        }
-                        Value::Void => {
-                            self.push(Value::Num(0.0));
-                        }
-                        Value::Boolean(val)=> {
-                            if *val {
-                                self.push(Value::Num(1.0));
-                            } else {
-                                self.push(Value::Num(0.0));
-                            }
-                        }
-                    }
+                    self.push(Value::Num(val.num_equiv()));
                 },
                 OpCode::Negate => {
                     let val = self.pop();
@@ -270,14 +277,89 @@ impl Vm {
                     let val = self.pop();
                     self.push(Value::Boolean(val.is_truthy()));
                 },
+                OpCode::Equal => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(val_a == val_b));
+                        },
+                        (Value::Boolean(val_b), Value::Boolean(val_a)) => {
+                            self.push(Value::Boolean(val_a == val_b));
+                        },
+                        (Value::Null, Value::Null) => {
+                            self.push(Value::Boolean(true));
+                        },
+                        (Value::Void, Value::Void) => {
+                            self.push(Value::Boolean(true));
+                        },
+                        _ => {
+                            self.push(Value::Boolean(false));
+                        },
+                    }
+                },
+                OpCode::Greater => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(val_a > val_b));
+                        },
+                        (b, a) => {
+                            self.push(Value::Boolean(a.num_equiv() > b.num_equiv()));
+                        },
+                    }
+                },
+                OpCode::GreaterOrEqual => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(val_a >= val_b));
+                        },
+                        (b, a) => {
+                            self.push(Value::Boolean(a.num_equiv() >= b.num_equiv()));
+                        },
+                    }
+                },
+                OpCode::Less => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(val_a < val_b));
+                        },
+                        (b, a) => {
+                            self.push(Value::Boolean(a.num_equiv() < b.num_equiv()));
+                        },
+                    }
+                },
+                OpCode::LessOrEqual => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(val_a <= val_b));
+                        },
+                        (b, a) => {
+                            self.push(Value::Boolean(a.num_equiv() <= b.num_equiv()));
+                        },
+                    }
+                },
+                OpCode::AlmostEqual => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Boolean(f64::abs(val_a - val_b) <= 0.00000001));
+                        },
+                        (b, a) => {
+                            self.push(Value::Boolean(a.num_equiv() == b.num_equiv()));
+                        },
+                    }
+                },
                 OpCode::Add => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a + val_b));
                         },
-                        _ => {
-                            self.push(Value::Num(f64::NAN));
+                        (b, a) => {
+                            self.push(Value::Num(a.num_equiv() + b.num_equiv()));
                         },
                     }
                 },
@@ -287,8 +369,8 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a - val_b));
                         }
-                        _ => {
-                            self.push(Value::Num(f64::NAN));
+                        (b, a) => {
+                            self.push(Value::Num(a.num_equiv() - b.num_equiv()));
                         },
                     }
                 },
@@ -298,8 +380,8 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a * val_b));
                         }
-                        _ => {
-                            self.push(Value::Num(f64::NAN));
+                        (b, a) => {
+                            self.push(Value::Num(a.num_equiv() * b.num_equiv()));
                         },
                     }
                 },
@@ -309,8 +391,8 @@ impl Vm {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a / val_b));
                         }
-                        _ => {
-                            self.push(Value::Num(f64::NAN));
+                        (b, a) => {
+                            self.push(Value::Num(a.num_equiv() / b.num_equiv()));
                         },
                     }
                 },
