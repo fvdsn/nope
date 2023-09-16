@@ -4,6 +4,7 @@ use crate::tokenizer::Token;
 use crate::tokenizer::TokenValue;
 use crate::tokenizer::TokenizerState;
 use crate::units::convert_unit_to_si;
+use crate::config::NopeConfig;
 
 fn is_reserved_keyword(name: &String) -> bool {
     return name == "true" ||  name == "false" || name == "null" ||
@@ -17,6 +18,8 @@ pub struct FunctionArg {
     is_func: bool,
     func_arity: usize,
 }
+
+use colored::*;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
@@ -60,15 +63,23 @@ enum ParserState{
     Error,
 }
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+enum Severity {
+    Info,
+    Critical,
+}
+
 #[derive(PartialEq, Debug)]
 pub struct ParserError {
     line: usize,
     col: usize,
     message: String,
+    severity: Severity,
 }
 
 #[derive(PartialEq, Debug)]
 pub struct Parser {
+    config: NopeConfig,
     pub tokenizer: Tokenizer,
     pub ast: Vec<AstNode>,
     env: Vec<EnvEntry>,
@@ -80,8 +91,9 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(source: String) -> Parser {
+    pub fn new(config: NopeConfig, source: String) -> Parser {
         return Parser{
+            config,
             tokenizer: Tokenizer::new(source),
             ast: vec![],
             env: vec![],
@@ -205,26 +217,39 @@ impl Parser {
         }
     }
 
-    fn _pretty_print_error_line(&self, line:usize, col:usize, message: &String) {
-        println!();
+    fn _pretty_print_error_line(&self, line:usize, col:usize, severity:Severity, message: &String) {
         let lines: Vec<&str> = self.tokenizer.source.lines().collect();
         let lineidx = line - 1;
         if lineidx >= 1 {
-            println!("{}", lines[lineidx-1]);
+            println!("  {}", lines[lineidx-1].italic());
         }
-        println!("{}", lines[lineidx]);
+        println!("  {}", lines[lineidx].italic());
         let colidx = col -1;
         let mut i:usize = 0;
+        print!("  ");
         loop {
             if i == colidx {
-                println!("^");
+                match severity {
+                    Severity::Critical => {
+                        println!("{}", "^".red());
+                    },
+                    Severity::Info => {
+                        println!("{}", "^".blue());
+                    },
+                };
                 break;
             } else {
                 print!("-");
                 i += 1;
             }
         }
-        println!("line: {}, col: {} // {}", line, col, message);
+        println!("  line: {}, col: {}   {}", line, col, 
+            match severity {
+                Severity::Critical => message.red(),
+                Severity::Info => message.blue(),
+            }
+        );
+        println!();
     }
 
     pub fn failed(&self) -> bool {
@@ -232,13 +257,14 @@ impl Parser {
     }
 
     pub fn print_errors(&self) {
+        println!();
         if let TokenizerState::Error(message) = &self.tokenizer.state {
-            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
+            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, Severity::Critical, message);
             return;
         }
         if self.parsing_failed() {
             for error in &self.errors {
-                self._pretty_print_error_line(error.line, error.col, &error.message);
+                self._pretty_print_error_line(error.line, error.col, error.severity, &error.message);
             }
             return;
         }
@@ -246,12 +272,12 @@ impl Parser {
 
     pub fn pretty_print(&self) {
         if let TokenizerState::Error(message) = &self.tokenizer.state {
-            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, message);
+            self._pretty_print_error_line(self.tokenizer.line, self.tokenizer.col, Severity::Critical, message);
             return;
         }
         if self.parsing_failed() {
             for error in &self.errors {
-                self._pretty_print_error_line(error.line, error.col, &error.message);
+                self._pretty_print_error_line(error.line, error.col, error.severity, &error.message);
             }
             return;
         }
@@ -366,10 +392,16 @@ impl Parser {
         return (token.line, token.col);
     }
 
+    fn push_info(&mut self, line: usize, col: usize, message: String) {
+        self.errors.push(
+            ParserError { line, col, message, severity:Severity::Info }
+        );
+    }
+
     fn push_error(&mut self, line: usize, col: usize, message: String) {
         self.state = ParserState::Error;
         self.errors.push(
-            ParserError { line, col, message }
+            ParserError { line, col, message, severity:Severity::Critical }
         );
     }
 
@@ -457,8 +489,8 @@ impl Parser {
         loop {
             if self.peek_closing_element() {
                 let (line, col) = self.peek_line_col();
-                self.push_error(fline, fcol, "start of unterminated function".to_owned());
-                self.push_error(line, col, "ERROR: missing | to close the function argument list".to_owned());
+                self.push_info(fline, fcol, "start of unterminated function".to_owned());
+                self.push_error(line, col,  "ERROR: missing | to close the function argument list".to_owned());
                 return;
             }
             let argname_token = &self.nextt().clone();
@@ -574,7 +606,7 @@ impl Parser {
         loop {
             if self.peek_eof() || self.peek_rightp() {
                 let (line, col) = self.peek_line_col();
-                self.push_error(aline, acol, "start of unfinished array".to_owned());
+                self.push_info(aline, acol, "start of unfinished array".to_owned());
                 self.push_error(line, col, "ERROR: unfinished array".to_owned());
                 return;
             } else if self.peek_rsqbrkt() {
@@ -625,7 +657,7 @@ impl Parser {
                     },
                     _ => {
                         let (line, col) = self.cur_line_col();
-                        self.push_error(aline, acol, "array with invalid key".to_owned());
+                        self.push_info(aline, acol, "array with invalid key".to_owned());
                         self.push_error(line, col, "ERROR: invalid key definition".to_owned());
                         return;
                     },
@@ -679,7 +711,7 @@ impl Parser {
         let cond_idx = self.cur_ast_node_index();
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
-            self.push_error(line, col, "this if is missing an expression".to_owned());
+            self.push_info(line, col, "this if is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'if'".to_owned());
             return;
         }
@@ -710,7 +742,7 @@ impl Parser {
         let target_idx = self.cur_ast_node_index();
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
-            self.push_error(line, col, "this set is missing an expression".to_owned());
+            self.push_info(line, col, "this set is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'set'".to_owned());
             return;
         }
@@ -740,7 +772,7 @@ impl Parser {
             self.ast.push(AstNode::Void(do_idx));
         } else if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
-            self.push_error(line, col, "this do is missing an expression".to_owned());
+            self.push_info(line, col, "this do is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'do'".to_owned());
             return;
         } else {
@@ -768,7 +800,7 @@ impl Parser {
         let cond_idx = self.cur_ast_node_index();
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
-            self.push_error(line, col, "this if is missing an expression".to_owned());
+            self.push_info(line, col, "this if is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected success expression for 'if'".to_owned());
             return;
         }
@@ -781,7 +813,7 @@ impl Parser {
         let expr_idx = self.cur_ast_node_index();
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
-            self.push_error(line, col, "this if is missing an expression".to_owned());
+            self.push_info(line, col, "this if is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
             return;
         }
@@ -812,7 +844,7 @@ impl Parser {
                 } else {
                     if self.peek_closing_element() {
                         let (vline, vcol) = self.peek_line_col();
-                        self.push_error(line, col, "this variable definition doesn't have a value".to_owned());
+                        self.push_info(line, col, "this variable definition doesn't have a value".to_owned());
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
@@ -823,7 +855,7 @@ impl Parser {
                     let def_idx = self.cur_ast_node_index();
                     if self.peek_closing_element() {
                         let (vline, vcol) = self.peek_line_col();
-                        self.push_error(line, col, "this variable definition doesn't have an expression".to_owned());
+                        self.push_info(line, col, "this variable definition doesn't have an expression".to_owned());
                         self.push_error(vline, vcol, "ERROR: expected expression in which to use the defined variable".to_owned());
                         return;
                     }
@@ -872,7 +904,7 @@ impl Parser {
                     for (arg_index, arg) in env_entry.func_args.iter().enumerate() {
                         if self.peek_closing_element() {
                             let (vline, vcol) = self.peek_line_col();
-                            self.push_error(line, col, "this function call is missing an argument".to_owned());
+                            self.push_info(line, col, "this function call is missing an argument".to_owned());
                             self.push_error(vline, vcol, "ERROR: expected argument for function call".to_owned());
                             return;
                         }
@@ -890,7 +922,7 @@ impl Parser {
                             match func {
                                 AstNode::FunctionDef(_, args, _) => {
                                     if args.len() != arg.func_arity {
-                                        self.push_error(line, col, "this function call has an argument type error".to_owned());
+                                        self.push_info(line, col, "this function call has an argument type error".to_owned());
                                         self.push_error(
                                             aline, acol,
                                             format!(
@@ -902,7 +934,7 @@ impl Parser {
                                     }
                                 },
                                 _ => {
-                                    self.push_error(line, col, "this function call has an argument type error".to_owned());
+                                    self.push_info(line, col, "this function call has an argument type error".to_owned());
                                     self.push_error(
                                         aline, acol,
                                         format!(
@@ -927,7 +959,7 @@ impl Parser {
                                 }
                             } else if uses_commas {
                                 let (cline, ccol) = self.peek_line_col();
-                                self.push_error(line, col, "this function call is missing some commas between its arguments".to_owned());
+                                self.push_info(line, col, "this function call is missing some commas between its arguments".to_owned());
                                 self.push_error(cline, ccol, "ERROR: expected a comma here".to_owned());
                                 return;
                             }
@@ -940,7 +972,7 @@ impl Parser {
             },
             None => {
                 let (line, col) = self.cur_line_col();
-                self.push_error(line, col, "ERROR: referenced variable has not been declared".to_owned());
+                self.push_error(line, col, "ERROR: undeclared variable".to_owned());
             }
         }
     }
@@ -1047,7 +1079,7 @@ impl Parser {
                     return;
                 }
                 if !self.peek_rightp() {
-                    self.push_error(pline, pcol, "unclosed '('".to_owned());
+                    self.push_info(pline, pcol, "unclosed '('".to_owned());
                     let (line, col) = self.peek_line_col();
                     self.push_error(line, col, "ERROR: expected closing ')'".to_owned());
                 } else {
@@ -1125,7 +1157,7 @@ impl Parser {
         }
         
         // ||
-        for name in ["random", "coinflip"] {
+        for name in ["random", "flip-coin"] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
             );
@@ -1137,7 +1169,7 @@ impl Parser {
             "sin", "cos", "tan", "inv", "/max", "/min", "/and",
             "/or", "/eq", "/add", "/mult", "len",
             // implemented
-            "num", "print", "neg", "return", "not", "bool"
+            "num", "print", "echo", "neg", "return", "not", "bool"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
@@ -1166,7 +1198,9 @@ impl Parser {
     }
 
     pub fn parse(&mut self) {
-        println!("tokenize...");
+        if self.config.debug {
+            println!("tokenize...");
+        }
 
         self.tokenizer.tokenize();
         if self.tokenizer.failed() {
@@ -1175,7 +1209,9 @@ impl Parser {
 
         self.set_stdlib();
 
-        println!("build ast...");
+        if self.config.debug {
+            println!("build ast...");
+        }
 
         self.parse_code_block();
 
@@ -1188,10 +1224,14 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const CONFIG: NopeConfig = NopeConfig {
+        debug: true,
+    };
     
     #[test]
     fn test_parse_empty() {
-        let mut parser = Parser::new(String::from(""));
+        let mut parser = Parser::new(CONFIG, String::from(""));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Done);
@@ -1199,7 +1239,7 @@ mod tests {
 
     #[test]
     fn test_parse_num() {
-        let mut parser = Parser::new(String::from("3.1415"));
+        let mut parser = Parser::new(CONFIG, String::from("3.1415"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(0, 3.1415)
@@ -1209,7 +1249,7 @@ mod tests {
 
     #[test]
     fn test_parse_num_comment() {
-        let mut parser = Parser::new(String::from("3.1415#comment"));
+        let mut parser = Parser::new(CONFIG, String::from("3.1415#comment"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(0, 3.1415)
@@ -1219,7 +1259,7 @@ mod tests {
 
     #[test]
     fn test_parse_num_unit() {
-        let mut parser = Parser::new(String::from("1.5mm"));
+        let mut parser = Parser::new(CONFIG, String::from("1.5mm"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(0, 0.0015)
@@ -1229,7 +1269,7 @@ mod tests {
 
     #[test]
     fn test_parse_num_bad_unit() {
-        let mut parser = Parser::new(String::from("1.5foo"));
+        let mut parser = Parser::new(CONFIG, String::from("1.5foo"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1237,7 +1277,7 @@ mod tests {
 
     #[test]
     fn test_parse_string() {
-        let mut parser = Parser::new(String::from("'hello'"));
+        let mut parser = Parser::new(CONFIG, String::from("'hello'"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::String(0, "hello".to_owned())
@@ -1247,7 +1287,7 @@ mod tests {
 
     #[test]
     fn test_parse_true() {
-        let mut parser = Parser::new(String::from("true"));
+        let mut parser = Parser::new(CONFIG, String::from("true"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Boolean(0, true)
@@ -1257,7 +1297,7 @@ mod tests {
 
     #[test]
     fn test_parse_false() {
-        let mut parser = Parser::new(String::from("false"));
+        let mut parser = Parser::new(CONFIG, String::from("false"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Boolean(0, false)
@@ -1267,7 +1307,7 @@ mod tests {
 
     #[test]
     fn test_parse_null() {
-        let mut parser = Parser::new(String::from("null"));
+        let mut parser = Parser::new(CONFIG, String::from("null"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Null(0)
@@ -1277,7 +1317,7 @@ mod tests {
 
     #[test]
     fn test_parse_void() {
-        let mut parser = Parser::new(String::from("void"));
+        let mut parser = Parser::new(CONFIG, String::from("void"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Void(0)
@@ -1287,7 +1327,7 @@ mod tests {
 
     #[test]
     fn test_parse_void_lodash() {
-        let mut parser = Parser::new(String::from("_"));
+        let mut parser = Parser::new(CONFIG, String::from("_"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Void(0)
@@ -1297,7 +1337,7 @@ mod tests {
 
     #[test]
     fn test_parse_undeclared_var() {
-        let mut parser = Parser::new(String::from("foobar"));
+        let mut parser = Parser::new(CONFIG, String::from("foobar"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1305,7 +1345,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_array() {
-        let mut parser = Parser::new(String::from("[]"));
+        let mut parser = Parser::new(CONFIG, String::from("[]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Array(1, vec![])
@@ -1315,7 +1355,7 @@ mod tests {
 
     #[test]
     fn test_parse_num_array() {
-        let mut parser = Parser::new(String::from("[3.14]"));
+        let mut parser = Parser::new(CONFIG, String::from("[3.14]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.14),
@@ -1326,7 +1366,7 @@ mod tests {
 
     #[test]
     fn test_parse_nums_array() {
-        let mut parser = Parser::new(String::from("[1 2 3]"));
+        let mut parser = Parser::new(CONFIG, String::from("[1 2 3]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 1.0),
@@ -1339,7 +1379,7 @@ mod tests {
 
     #[test]
     fn test_parse_mixed_array() {
-        let mut parser = Parser::new(String::from("[true false void null 10 3.14 'hello' -world]"));
+        let mut parser = Parser::new(CONFIG, String::from("[true false void null 10 3.14 'hello' -world]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Boolean(1, true),
@@ -1357,7 +1397,7 @@ mod tests {
 
     #[test]
     fn test_parse_nested_array() {
-        let mut parser = Parser::new(String::from("[[]]"));
+        let mut parser = Parser::new(CONFIG, String::from("[[]]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Array(2, vec![]),
@@ -1368,7 +1408,7 @@ mod tests {
 
     #[test]
     fn test_parse_unfinished_array() {
-        let mut parser = Parser::new(String::from("[[]"));
+        let mut parser = Parser::new(CONFIG, String::from("[[]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Array(2, vec![]),
@@ -1378,7 +1418,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval() {
-        let mut parser = Parser::new(String::from("[key:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[key:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1390,7 +1430,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_string() {
-        let mut parser = Parser::new(String::from("['key':99]"));
+        let mut parser = Parser::new(CONFIG, String::from("['key':99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1402,7 +1442,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_dash_string() {
-        let mut parser = Parser::new(String::from("[-key:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[-key:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1414,7 +1454,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_num() {
-        let mut parser = Parser::new(String::from("[40.1:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[40.1:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1426,7 +1466,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_int() {
-        let mut parser = Parser::new(String::from("[40:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[40:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1438,7 +1478,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_kw() {
-        let mut parser = Parser::new(String::from("[null:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[null:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1450,7 +1490,7 @@ mod tests {
 
     #[test]
     fn test_parse_missing_val_in_keyval() {
-        let mut parser = Parser::new(String::from("[key:]"));
+        let mut parser = Parser::new(CONFIG, String::from("[key:]"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1458,7 +1498,7 @@ mod tests {
 
     #[test]
     fn test_parse_eof_in_keyval() {
-        let mut parser = Parser::new(String::from("[key:"));
+        let mut parser = Parser::new(CONFIG, String::from("[key:"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1466,7 +1506,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_key_in_keyval() {
-        let mut parser = Parser::new(String::from("[!:88]"));
+        let mut parser = Parser::new(CONFIG, String::from("[!:88]"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1474,7 +1514,7 @@ mod tests {
 
     #[test]
     fn test_parse_nested_key_array() {
-        let mut parser = Parser::new(String::from("[foo:[bim:99]]"));
+        let mut parser = Parser::new(CONFIG, String::from("[foo:[bim:99]]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(6, 99.0),
@@ -1488,7 +1528,7 @@ mod tests {
 
     #[test]
     fn test_parse_error() {
-        let mut parser = Parser::new(String::from("!3.1415"));
+        let mut parser = Parser::new(CONFIG, String::from("!3.1415"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.1415),
@@ -1499,7 +1539,7 @@ mod tests {
 
     #[test]
     fn test_parse_paren() {
-        let mut parser = Parser::new(String::from("(3.1415)"));
+        let mut parser = Parser::new(CONFIG, String::from("(3.1415)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.1415),
@@ -1509,7 +1549,7 @@ mod tests {
 
     #[test]
     fn test_parse_paren_unclosed() {
-        let mut parser = Parser::new(String::from("(3.1415"));
+        let mut parser = Parser::new(CONFIG, String::from("(3.1415"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.1415),
@@ -1519,7 +1559,7 @@ mod tests {
 
     #[test]
     fn test_parse_paren_void() {
-        let mut parser = Parser::new(String::from("()"));
+        let mut parser = Parser::new(CONFIG, String::from("()"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Void(0),
@@ -1529,7 +1569,7 @@ mod tests {
 
     #[test]
     fn test_parse_basic_let() {
-        let mut parser = Parser::new(String::from("let x 3 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 _"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -1541,7 +1581,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_defines_var() {
-        let mut parser = Parser::new(String::from("let x 3 x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 x"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -1553,7 +1593,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_wrong_var() {
-        let mut parser = Parser::new(String::from("let x 3 y"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 y"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -1563,7 +1603,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_missing_expr() {
-        let mut parser = Parser::new(String::from("let x 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -1573,7 +1613,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_missing_val() {
-        let mut parser = Parser::new(String::from("let x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1581,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_missing_everything() {
-        let mut parser = Parser::new(String::from("let"));
+        let mut parser = Parser::new(CONFIG, String::from("let"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1590,7 +1630,7 @@ mod tests {
     #[test]
     fn test_parse_let_redefine_keyword() {
         for kw in ["null", "true", "false", "void", "do", "if", "ife", "end"] {
-            let mut parser = Parser::new(String::from(format!("let {} 3 _", kw)));
+            let mut parser = Parser::new(CONFIG, String::from(format!("let {} 3 _", kw)));
             parser.parse();
             assert_eq!(parser.ast, vec![]);
             assert_eq!(parser.state, ParserState::Error);
@@ -1600,7 +1640,7 @@ mod tests {
     #[test]
     fn test_parse_let_not_a_varname() {
         for kw in ["3.14", "()", "[]", "|a|", "'str'", "-str"] {
-            let mut parser = Parser::new(String::from(format!("let {} 3 _", kw)));
+            let mut parser = Parser::new(CONFIG, String::from(format!("let {} 3 _", kw)));
             parser.parse();
             assert_eq!(parser.ast, vec![]);
             assert_eq!(parser.state, ParserState::Error);
@@ -1609,7 +1649,7 @@ mod tests {
 
     #[test]
     fn test_parse_chained_let() {
-        let mut parser = Parser::new(String::from("let x 3 let y 4 [x y]"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 [x y]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -1625,56 +1665,56 @@ mod tests {
 
     #[test]
     fn test_parse_chained_let_wrong_var() {
-        let mut parser = Parser::new(String::from("let x 3 let y 4 [x z]"));
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 [x z]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_diff_good_scope() {
-        let mut parser = Parser::new(String::from("let x [let y 3 [y]] x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [y]] x"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_diff_wrong_scope() {
-        let mut parser = Parser::new(String::from("let x [let y 3 [x y]] x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [x y]] x"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_diff_wrong_scope2() {
-        let mut parser = Parser::new(String::from("let x [let y 3 [y]] y"));
+        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [y]] y"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_std_func() {
-        let mut parser = Parser::new(String::from("(print add 1 2)"));
+        let mut parser = Parser::new(CONFIG, String::from("(print add 1 2)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_std_func_wrong1() {
-        let mut parser = Parser::new(String::from("(print add 1 2 3)"));
+        let mut parser = Parser::new(CONFIG, String::from("(print add 1 2 3)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_std_func_wrong2() {
-        let mut parser = Parser::new(String::from("(print add 1)"));
+        let mut parser = Parser::new(CONFIG, String::from("(print add 1)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_func_0() {
-        let mut parser = Parser::new(String::from("|| 42"));
+        let mut parser = Parser::new(CONFIG, String::from("|| 42"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(2, 42.0),
@@ -1685,14 +1725,14 @@ mod tests {
 
     #[test]
     fn test_parse_func_0_missing_body() {
-        let mut parser = Parser::new(String::from("||"));
+        let mut parser = Parser::new(CONFIG, String::from("||"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_func_1() {
-        let mut parser = Parser::new(String::from("|a| a"));
+        let mut parser = Parser::new(CONFIG, String::from("|a| a"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::ValueReference(3, "a".to_owned()),
@@ -1709,7 +1749,7 @@ mod tests {
             "3.14", "()", "[]", "null", "void", "true",
             "false", "let", "do", "if", "ife", "'str'", "-str"
         ] {
-            let mut parser = Parser::new(String::from(format!("|{}| 3", kw)));
+            let mut parser = Parser::new(CONFIG, String::from(format!("|{}| 3", kw)));
             parser.parse();
             assert_eq!(parser.ast, vec![]);
             assert_eq!(parser.state, ParserState::Error);
@@ -1718,21 +1758,21 @@ mod tests {
 
     #[test]
     fn test_parse_func_1_missing_body() {
-        let mut parser = Parser::new(String::from("|a|"));
+        let mut parser = Parser::new(CONFIG, String::from("|a|"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_func_1_bad_ref() {
-        let mut parser = Parser::new(String::from("|a| b"));
+        let mut parser = Parser::new(CONFIG, String::from("|a| b"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_func_2() {
-        let mut parser = Parser::new(String::from("|a b| [a b]"));
+        let mut parser = Parser::new(CONFIG, String::from("|a b| [a b]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::ValueReference(5, "a".to_owned()),
@@ -1748,42 +1788,42 @@ mod tests {
 
     #[test]
     fn test_parse_func_2_bad_ref() {
-        let mut parser = Parser::new(String::from("|a b| [a z]"));
+        let mut parser = Parser::new(CONFIG, String::from("|a b| [a z]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_func_scope() {
-        let mut parser = Parser::new(String::from("let f |a| a f 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let f |a| a f 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_func_scope_bad() {
-        let mut parser = Parser::new(String::from("let f |a| a f a"));
+        let mut parser = Parser::new(CONFIG, String::from("let f |a| a f a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_func_recursive() {
-        let mut parser = Parser::new(String::from("let f |a| f 3 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let f |a| f 3 _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_func_recursive_p() {
-        let mut parser = Parser::new(String::from("let f (|a| f 3) _"));
+        let mut parser = Parser::new(CONFIG, String::from("let f (|a| f 3) _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_func_1_funcarg() {
-        let mut parser = Parser::new(String::from("(|a:2| a 3 4)"));
+        let mut parser = Parser::new(CONFIG, String::from("(|a:2| a 3 4)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(7, 3.0),
@@ -1796,28 +1836,28 @@ mod tests {
 
     #[test]
     fn test_parse_typecheck_func() {
-        let mut parser = Parser::new(String::from("iter [1 2] |v| print v"));
+        let mut parser = Parser::new(CONFIG, String::from("iter [1 2] |v| print v"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_typecheck_func_fail() {
-        let mut parser = Parser::new(String::from("iter [1 2] |k v| print v"));
+        let mut parser = Parser::new(CONFIG, String::from("iter [1 2] |k v| print v"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_typecheck_func_fail2() {
-        let mut parser = Parser::new(String::from("iter [1 2] || print 'hey'"));
+        let mut parser = Parser::new(CONFIG, String::from("iter [1 2] || print 'hey'"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_ife() {
-        let mut parser = Parser::new(String::from("(ife true 99 64)"));
+        let mut parser = Parser::new(CONFIG, String::from("(ife true 99 64)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Boolean(2, true),
@@ -1830,28 +1870,28 @@ mod tests {
 
     #[test]
     fn test_parse_ife_wrong1() {
-        let mut parser = Parser::new(String::from("(ife true 99)"));
+        let mut parser = Parser::new(CONFIG, String::from("(ife true 99)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_ife_wrong2() {
-        let mut parser = Parser::new(String::from("(ife true)"));
+        let mut parser = Parser::new(CONFIG, String::from("(ife true)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_ife_wrong3() {
-        let mut parser = Parser::new(String::from("(ife)"));
+        let mut parser = Parser::new(CONFIG, String::from("(ife)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_if() {
-        let mut parser = Parser::new(String::from("(if true 99)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if true 99)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Boolean(2, true),
@@ -1863,21 +1903,21 @@ mod tests {
 
     #[test]
     fn test_parse_if_wrong1() {
-        let mut parser = Parser::new(String::from("(if true)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if true)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_if_wrong2() {
-        let mut parser = Parser::new(String::from("(if)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_do() {
-        let mut parser = Parser::new(String::from("(do 64 99)"));
+        let mut parser = Parser::new(CONFIG, String::from("(do 64 99)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(2, 64.0),
@@ -1889,7 +1929,7 @@ mod tests {
 
     #[test]
     fn test_parse_do_early_close() {
-        let mut parser = Parser::new(String::from("(do 64)"));
+        let mut parser = Parser::new(CONFIG, String::from("(do 64)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 64.0),
@@ -1901,28 +1941,28 @@ mod tests {
 
     #[test]
     fn test_parse_do_wrong1() {
-        let mut parser = Parser::new(String::from("[do 64]"));
+        let mut parser = Parser::new(CONFIG, String::from("[do 64]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_do_wrong2() {
-        let mut parser = Parser::new(String::from("(do)"));
+        let mut parser = Parser::new(CONFIG, String::from("(do)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_do_wrong3() {
-        let mut parser = Parser::new(String::from("do 64"));
+        let mut parser = Parser::new(CONFIG, String::from("do 64"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_foo_dot_bar() {
-        let mut parser = Parser::new(String::from("foo.'bar'"));
+        let mut parser = Parser::new(CONFIG, String::from("foo.'bar'"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::String(2, "bar".to_string()),
@@ -1933,7 +1973,7 @@ mod tests {
 
     #[test]
     fn test_parse_foo_dot_bim_dot_bar() {
-        let mut parser = Parser::new(String::from("foo.bim.'bar'"));
+        let mut parser = Parser::new(CONFIG, String::from("foo.bim.'bar'"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::String(4, "bar".to_string()),
@@ -1945,7 +1985,7 @@ mod tests {
 
     #[test]
     fn test_parse_foo_dot_add_1_2() {
-        let mut parser = Parser::new(String::from("foo.add 1 2"));
+        let mut parser = Parser::new(CONFIG, String::from("foo.add 1 2"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(3, 1.0),
@@ -1958,14 +1998,14 @@ mod tests {
 
     #[test]
     fn test_parse_dangling_key() {
-        let mut parser = Parser::new(String::from("(foo.)"));
+        let mut parser = Parser::new(CONFIG, String::from("(foo.)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_dynkey_num() {
-        let mut parser = Parser::new(String::from("[3]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[3]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(1, 3.0),
@@ -1977,7 +2017,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_null() {
-        let mut parser = Parser::new(String::from("[null]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[null]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Null(1),
@@ -1989,7 +2029,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_void() {
-        let mut parser = Parser::new(String::from("[_]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[_]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Void(1),
@@ -2001,7 +2041,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_bool() {
-        let mut parser = Parser::new(String::from("[true]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[true]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Boolean(1, true),
@@ -2013,7 +2053,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_str() {
-        let mut parser = Parser::new(String::from("['key']12"));
+        let mut parser = Parser::new(CONFIG, String::from("['key']12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::String(1, "key".to_string()),
@@ -2025,7 +2065,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_var() {
-        let mut parser = Parser::new(String::from("let pi 3.14 [pi]12"));
+        let mut parser = Parser::new(CONFIG, String::from("let pi 3.14 [pi]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(2, 3.14),
@@ -2039,7 +2079,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_key_filter() {
-        let mut parser = Parser::new(String::from("[key:45]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[key:45]12"));
         // filters all elements with key 'key' and value 45
         parser.parse();
         assert_eq!(parser.ast, vec![
@@ -2053,7 +2093,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_func_filter() {
-        let mut parser = Parser::new(String::from("[|k v| true]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[|k v| true]12"));
         // filters all elements with key 'key' and value 45
         parser.parse();
         assert_eq!(parser.ast, vec![
@@ -2070,7 +2110,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_rec() {
-        let mut parser = Parser::new(String::from("[3][4]12"));
+        let mut parser = Parser::new(CONFIG, String::from("[3][4]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(1, 3.0),
@@ -2084,7 +2124,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_to_array() {
-        let mut parser = Parser::new(String::from("[3][4]"));
+        let mut parser = Parser::new(CONFIG, String::from("[3][4]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.0),
@@ -2097,7 +2137,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_in_array() {
-        let mut parser = Parser::new(String::from("[[3][4]]"));
+        let mut parser = Parser::new(CONFIG, String::from("[[3][4]]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
@@ -2111,7 +2151,7 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_in_array_paren() {
-        let mut parser = Parser::new(String::from("[([3])[4]]"));
+        let mut parser = Parser::new(CONFIG, String::from("[([3])[4]]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 3.0),
@@ -2125,28 +2165,28 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_func_filter_wrong_argc0() {
-        let mut parser = Parser::new(String::from("[||true]33"));
+        let mut parser = Parser::new(CONFIG, String::from("[||true]33"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_dynkey_func_filter_wrong_argc1() {
-        let mut parser = Parser::new(String::from("[|v|true]33"));
+        let mut parser = Parser::new(CONFIG, String::from("[|v|true]33"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_dynkey_func_filter_wrong_argc3() {
-        let mut parser = Parser::new(String::from("[|a b c|true]33"));
+        let mut parser = Parser::new(CONFIG, String::from("[|a b c|true]33"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_no_func_in_arrays() {
-        let mut parser = Parser::new(String::from("[|a|true]"));
+        let mut parser = Parser::new(CONFIG, String::from("[|a|true]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -2154,7 +2194,7 @@ mod tests {
     #[test]
     fn test_parse_dont_redefine_void() {
         // _ must always stay a void value. assigning a value to it has no effect
-        let mut parser = Parser::new(String::from("let _ |a| true _"));
+        let mut parser = Parser::new(CONFIG, String::from("let _ |a| true _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2162,42 +2202,42 @@ mod tests {
     #[test]
     fn test_parse_dont_redefine_void_in_func_args() {
         // _ must always stay a void value.
-        let mut parser = Parser::new(String::from("|_:2| _"));
+        let mut parser = Parser::new(CONFIG, String::from("|_:2| _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_no_commas() {
-        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1 2 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1 2 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_all_commas() {
-        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1, 2, 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1, 2, 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_missing_comma1() {
-        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1 2, 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1 2, 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_missing_comma2() {
-        let mut parser = Parser::new(String::from("let foo |a b c| _ foo 1, 2 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1, 2 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_code_block() {
-        let mut parser = Parser::new(String::from("print 3.14 print 4.92"));
+        let mut parser = Parser::new(CONFIG, String::from("print 3.14 print 4.92"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.14),
@@ -2211,7 +2251,7 @@ mod tests {
 
     #[test]
     fn test_parse_code_block_env_carry_over() {
-        let mut parser = Parser::new(String::from("let a 3 _ print a"));
+        let mut parser = Parser::new(CONFIG, String::from("let a 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
         assert_eq!(parser.ast, vec![
@@ -2226,14 +2266,14 @@ mod tests {
 
     #[test]
     fn test_parse_code_block_env_carry_over2() {
-        let mut parser = Parser::new(String::from("let a 3 let b 4 _ add a b"));
+        let mut parser = Parser::new(CONFIG, String::from("let a 3 let b 4 _ add a b"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_code_block_env_carry_over_wrong() {
-        let mut parser = Parser::new(String::from("if true let a 3 _ print a"));
+        let mut parser = Parser::new(CONFIG, String::from("if true let a 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }

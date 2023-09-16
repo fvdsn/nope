@@ -1,7 +1,14 @@
 use rand::Rng;
-use crate::parser::Parser;
-use crate::parser::AstNode;
 use std::time::SystemTime;
+use crate::{
+    parser::{
+        Parser,
+        AstNode,
+    },
+    config::NopeConfig,
+};
+
+use colored::*;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum Value {
@@ -34,6 +41,7 @@ impl Value {
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum OpCode {
     Constant(usize),
+    ConstantNum(f64),
     Return,
     Negate,
     Add,
@@ -42,6 +50,7 @@ enum OpCode {
     Divide,
     Random,
     Print,
+    Echo,
     Num,
     Not,
     Bool,
@@ -103,6 +112,7 @@ pub enum InterpretResult {
 
 #[derive(Debug)]
 pub struct Vm {
+    config: NopeConfig,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -110,8 +120,9 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn new () -> Vm {
+    pub fn new (config: NopeConfig) -> Vm {
         return Vm {
+            config,
             chunk: Chunk::new(),
             stack: vec![],
             ip: 0,
@@ -136,9 +147,34 @@ impl Vm {
         }
     }
 
+    fn echo_val(&self, val: &Value) {
+        match val {
+            Value::Void => {
+                println!();
+            }
+            _ => {
+                println!();
+                match val {
+                    Value::Void => {},
+                    Value::Num(num) => { println!("  {}", format!("{}", num).blue()); },
+                    Value::Null => { println!("  {}", "null".blue()); },
+                    Value::Boolean(val)=> {
+                        println!("  {}",
+                            if *val { "true".blue() } else { "false".blue() }
+                        )
+                    },
+                };
+                println!();
+            }
+        };
+    }
+
     pub fn interpret(&mut self, code: String) -> InterpretResult {
-        println!("create parser...");
-        let mut parser = Parser::new(code);
+        if self.config.debug {
+            println!("create parser...");
+        }
+        
+        let mut parser = Parser::new(self.config, code);
 
         parser.parse();
 
@@ -146,27 +182,34 @@ impl Vm {
             parser.print_errors();
             return InterpretResult::CompileError;
         }
+        
+        if self.config.debug {
+            println!("compile...");
+        }
 
-        println!("compile...");
         if !self.compile(&parser.ast) {
             println!("compilation error");
             self.chunk.pretty_print();
             return InterpretResult::CompileError
         }
 
-        println!("run...\n");
+        if self.config.debug {
+            println!("run...\n");
+        }
         
         let now = SystemTime::now();
         let res = self.run();
 
-        match now.elapsed() {
-            Ok(elapsed) => {
-                println!("\n Ran in {}s", elapsed.as_secs());
-            }
-            _ => {
-                println!("wtf");
-            }
-        };
+        if self.config.debug {
+            match now.elapsed() {
+                Ok(elapsed) => {
+                    println!("\n Ran in {}s", elapsed.as_secs());
+                }
+                _ => {
+                    println!("wtf");
+                }
+            };
+        }
 
         return res;
     }
@@ -200,6 +243,7 @@ impl Vm {
                     "neg" => { self.chunk.push_op(node_idx, OpCode::Negate) },
                     "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
                     "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
+                    "echo" => { self.chunk.push_op(node_idx, OpCode::Echo) },
                     "num" => { self.chunk.push_op(node_idx, OpCode::Num) },
                     "not" => { self.chunk.push_op(node_idx, OpCode::Not) },
                     "bool" => { self.chunk.push_op(node_idx, OpCode::Bool) },
@@ -212,6 +256,11 @@ impl Vm {
                     "!=" => { 
                         self.chunk.push_op(node_idx, OpCode::Equal);
                         self.chunk.push_op(node_idx, OpCode::Not);
+                    },
+                    "flip-coin" => { 
+                        self.chunk.push_op(node_idx, OpCode::Random);
+                        self.chunk.push_op(node_idx, OpCode::ConstantNum(0.5));
+                        self.chunk.push_op(node_idx, OpCode::GreaterOrEqual);
                     },
                     _ => { 
                         println!("unknown function {}", name);
@@ -250,9 +299,15 @@ impl Vm {
                 OpCode::Print=> {
                     self.print_val(&self.stack[self.stack.len() - 1]);
                 },
+                OpCode::Echo=> {
+                    self.echo_val(&self.stack[self.stack.len() - 1]);
+                },
                 OpCode::Constant(cst_idx) => {
                     let cst = self.chunk.constants[cst_idx];
                     self.push(cst);
+                },
+                OpCode::ConstantNum(num)  => {
+                    self.push(Value::Num(num));
                 },
                 OpCode::Num => {
                     let val = self.pop();

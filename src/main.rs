@@ -1,9 +1,14 @@
 #![allow(clippy::needless_return)]
 
+
+use rand;
+use rand::seq::SliceRandom;
 use std::fs;
+use std::io::{self, Write};
 use clap::{Arg, Command};
 
 
+mod config;
 mod tokenizer;
 mod parser;
 mod units;
@@ -13,7 +18,56 @@ use crate::{
     tokenizer::Tokenizer,
     parser::Parser,
     vm::Vm,
+    config::NopeConfig,
 };
+
+use colored::*;
+
+fn print_colored_line(len: usize, c:&str) {
+    print!("  ");
+    for _ in 0..len {
+        print!("{}", c.blue());
+    }
+    println!();
+}
+
+fn print_banner() {
+    let messages: Vec<&str> = vec![
+        "Enjoy!",
+        "You can do it!",
+        "Have fun!",
+        "You are amazing!",
+        "... Turbo mode activated!",
+        "All Systems are GO!",
+        "Today is a good Day!",
+    ];
+    let mut rng = rand::thread_rng();
+    let banner = format!(
+        "Welcome to the NOPE repl! {}",
+        messages.choose(&mut rng).expect("should not happen")
+    );
+    println!();
+    print_colored_line(banner.len()+4, "-");
+    println!("  {} {} {}", ":".blue(), banner, ":".blue());
+    print_colored_line(banner.len()+4, "=");
+    println!();
+}
+
+fn repl(vm: &mut Vm) {
+    print_banner();
+    loop {
+        print!("{} ", ">".blue());
+        io::stdout().flush().unwrap();
+        let mut line = String::new();
+        io::stdin()
+            .read_line(&mut line)
+            .expect("Unable to read line from the REPL");
+        if line.is_empty() {
+            break;
+        }
+        vm.interpret(line);
+    }
+}
 
 
 fn main() {
@@ -50,6 +104,14 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("debug")
+                .long("debug")
+                .short('d')
+                .takes_value(false)
+                .help("Activate debug logs")
+                .required(false)
+        )
+        .arg(
             Arg::new("eval")
                 .long("eval")
                 .short('e')
@@ -66,6 +128,16 @@ fn main() {
         .after_help("")
         .get_matches();
 
+    let config = NopeConfig {
+        debug: m.is_present("debug"),
+    };
+
+    if !m.is_present("eval") || !m.is_present("filename") {
+        let mut vm = Vm::new(config);
+        repl(&mut vm);
+        return;
+    }
+
     let source = if m.is_present("eval") {
         String::from(m.value_of("eval").expect("no code provided to --eval argument"))
     } else {
@@ -73,22 +145,21 @@ fn main() {
         fs::read_to_string(filename).expect("Could not read file")
     };
 
-
     if m.is_present("tokenize") {
         let mut tokenizer = Tokenizer::new(source);
         tokenizer.tokenize();
         tokenizer.print();
     } else if m.is_present("parse") {
-        let mut parser = Parser::new(source);
+        let mut parser = Parser::new(config, source);
         parser.parse();
         parser.tokenizer.print();
         parser.print();
     } else if m.is_present("ast") {
-        let mut parser = Parser::new(source);
+        let mut parser = Parser::new(config, source);
         parser.parse();
         parser.pretty_print();
     } else {
-        let mut vm = Vm::new();
+        let mut vm = Vm::new(config);
         vm.interpret(source);
     }
 }
