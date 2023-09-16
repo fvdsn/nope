@@ -1,10 +1,11 @@
 #![allow(clippy::needless_return)]
+use rustyline::error::ReadlineError;
+use rustyline::{DefaultEditor};
 
 
 use rand;
 use rand::seq::SliceRandom;
 use std::fs;
-use std::io::{self, Write};
 use clap::{Arg, Command};
 
 
@@ -54,18 +55,29 @@ fn print_banner() {
 }
 
 fn repl(vm: &mut Vm) {
+    let mut rl = DefaultEditor::new().expect("could not activate line editor");
+
     print_banner();
     loop {
-        print!("{} ", ">".blue());
-        io::stdout().flush().unwrap();
-        let mut line = String::new();
-        io::stdin()
-            .read_line(&mut line)
-            .expect("Unable to read line from the REPL");
-        if line.is_empty() {
-            break;
+        let readline = rl.readline(&format!("{}", "> ".blue()));
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_str()).ok();
+                vm.interpret(line);
+            },
+            Err(ReadlineError::Interrupted) => {
+                println!("  {}", "exit (^C)".blue());
+                break
+            },
+            Err(ReadlineError::Eof) => {
+                println!("  {}", "exit (^D)".blue());
+                break
+            },
+            Err(err) => {
+                println!("  {}", format!("Error: {:?}", err).red());
+                break
+            }
         }
-        vm.interpret(line);
     }
 }
 
