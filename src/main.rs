@@ -40,7 +40,12 @@ fn print_banner() {
         "You are amazing!",
         "... Turbo mode activated!",
         "All Systems are GO!",
-        "Today is a good Day!",
+        "Today is a good day!",
+        "Peace ✌️",
+        "Make something incredible!",
+        "Make something small!",
+        "Make something fun!",
+        "©2023",
     ];
     let mut rng = rand::thread_rng();
     let banner = format!(
