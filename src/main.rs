@@ -38,14 +38,15 @@ fn print_banner() {
         "You can do it!",
         "Have fun!",
         "You are amazing!",
-        "... Turbo mode activated!",
+        "Turbo mode activated!",
         "All Systems are GO!",
         "Today is a good day!",
         "Peace ✌️",
         "Make something incredible!",
         "Make something small!",
         "Make something fun!",
-        "©2023",
+        "Make something cute!",
+        "Make something cool!",
     ];
     let mut rng = rand::thread_rng();
     let banner = format!(
@@ -53,9 +54,9 @@ fn print_banner() {
         messages.choose(&mut rng).expect("should not happen")
     );
     println!();
-    print_colored_line(banner.len()+4, "-");
+    print_colored_line(banner.chars().count()+4, "-");
     println!("  {} {} {}", ":".blue(), banner, ":".blue());
-    print_colored_line(banner.len()+4, "=");
+    print_colored_line(banner.chars().count()+4, "=");
     println!();
 }
 

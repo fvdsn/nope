@@ -1157,7 +1157,7 @@ impl Parser {
         }
         
         // ||
-        for name in ["random", "flip-coin"] {
+        for name in ["random", "rand100", "flip-coin"] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
             );
@@ -1165,11 +1165,12 @@ impl Parser {
 
         // |a|
         for name in [
-            "range", "decr", "incr", "increment",
+            "range", "increment",
             "sin", "cos", "tan", "inv", "/max", "/min", "/and",
             "/or", "/eq", "/add", "/mult", "len",
             // implemented
-            "num", "print", "echo", "neg", "return", "not", "bool"
+            "num", "print", "echo", "neg", "return", "not", "bool",
+            "floor", "ceil", "abs", "decr", "incr"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
@@ -1181,10 +1182,12 @@ impl Parser {
         }
         // |a b|
         for name in vec![
-            "and", "or", "eq", "neq", "add", "sub", "mod", "mult",
-            "div", "exp", "max", "min",
+            "and", "or", "eq", "neq", "mod",
+            "exp",
             //implemented
+            "add", "sub",
             "<", "<=", ">", ">=", "==", "~=", "!=", "!~=",
+            "max", "min", "mult", "div"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 

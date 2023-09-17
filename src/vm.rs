@@ -57,6 +57,13 @@ enum OpCode {
     Equal,
     Greater,
     Less,
+    Max,
+    Min,
+    Floor,
+    Ceil,
+    Abs,
+    Decr,
+    Incr,
     GreaterOrEqual,
     LessOrEqual,
     AlmostEqual,
@@ -240,7 +247,14 @@ impl Vm {
                     "sub" => { self.chunk.push_op(node_idx, OpCode::Substract) },
                     "mult" => { self.chunk.push_op(node_idx, OpCode::Multiply) },
                     "div" => { self.chunk.push_op(node_idx, OpCode::Divide) },
+                    "min" => { self.chunk.push_op(node_idx, OpCode::Min) },
+                    "max" => { self.chunk.push_op(node_idx, OpCode::Max) },
                     "neg" => { self.chunk.push_op(node_idx, OpCode::Negate) },
+                    "abs" => { self.chunk.push_op(node_idx, OpCode::Abs) },
+                    "floor" => { self.chunk.push_op(node_idx, OpCode::Floor) },
+                    "ceil" => { self.chunk.push_op(node_idx, OpCode::Ceil) },
+                    "decr" => { self.chunk.push_op(node_idx, OpCode::Decr) },
+                    "incr" => { self.chunk.push_op(node_idx, OpCode::Incr) },
                     "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
                     "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
                     "echo" => { self.chunk.push_op(node_idx, OpCode::Echo) },
@@ -261,6 +275,12 @@ impl Vm {
                         self.chunk.push_op(node_idx, OpCode::Random);
                         self.chunk.push_op(node_idx, OpCode::ConstantNum(0.5));
                         self.chunk.push_op(node_idx, OpCode::GreaterOrEqual);
+                    },
+                    "rand100" => { 
+                        self.chunk.push_op(node_idx, OpCode::Random);
+                        self.chunk.push_op(node_idx, OpCode::ConstantNum(100.0));
+                        self.chunk.push_op(node_idx, OpCode::Multiply);
+                        self.chunk.push_op(node_idx, OpCode::Floor);
                     },
                     _ => { 
                         println!("unknown function {}", name);
@@ -321,6 +341,61 @@ impl Vm {
                         },
                         _ => {
                             self.push(Value::Num(f64::NAN));
+                        },
+                    }
+                },
+                OpCode::Abs=> {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::abs(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::abs(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Floor=> {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::floor(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::floor(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Ceil=> {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::ceil(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::ceil(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Incr=> {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(*num + 1.0));
+                        },
+                        _ => {
+                            self.push(Value::Num(val.num_equiv() + 1.0));
+                        },
+                    }
+                },
+                OpCode::Decr=> {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(*num - 1.0));
+                        },
+                        _ => {
+                            self.push(Value::Num(val.num_equiv() - 1.0));
                         },
                     }
                 },
@@ -448,6 +523,28 @@ impl Vm {
                         }
                         (b, a) => {
                             self.push(Value::Num(a.num_equiv() / b.num_equiv()));
+                        },
+                    }
+                },
+                OpCode::Min => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Num(f64::min(val_a, val_b)));
+                        }
+                        (b, a) => {
+                            self.push(Value::Num(f64::min(a.num_equiv(), b.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Max => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Num(f64::max(val_a, val_b)));
+                        }
+                        (b, a) => {
+                            self.push(Value::Num(f64::max(a.num_equiv(), b.num_equiv())));
                         },
                     }
                 },
