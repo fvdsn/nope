@@ -1166,11 +1166,12 @@ impl Parser {
         // |a|
         for name in [
             "range", "increment",
-            "sin", "cos", "tan", "inv", "/max", "/min", "/and",
+            "/max", "/min", "/and",
             "/or", "/eq", "/add", "/mult", "len",
             // implemented
             "num", "print", "echo", "neg", "return", "not", "bool",
-            "floor", "ceil", "abs", "decr", "incr"
+            "floor", "ceil", "abs", "decr", "incr", "sin", "cos", 
+            "tan", "inv",
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 

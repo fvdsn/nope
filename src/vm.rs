@@ -64,6 +64,10 @@ enum OpCode {
     Abs,
     Decr,
     Incr,
+    Sin,
+    Cos,
+    Tan,
+    Inv,
     GreaterOrEqual,
     LessOrEqual,
     AlmostEqual,
@@ -255,6 +259,10 @@ impl Vm {
                     "ceil" => { self.chunk.push_op(node_idx, OpCode::Ceil) },
                     "decr" => { self.chunk.push_op(node_idx, OpCode::Decr) },
                     "incr" => { self.chunk.push_op(node_idx, OpCode::Incr) },
+                    "sin" => { self.chunk.push_op(node_idx, OpCode::Sin) },
+                    "cos" => { self.chunk.push_op(node_idx, OpCode::Cos) },
+                    "tan" => { self.chunk.push_op(node_idx, OpCode::Tan) },
+                    "inv" => { self.chunk.push_op(node_idx, OpCode::Inv) },
                     "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
                     "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
                     "echo" => { self.chunk.push_op(node_idx, OpCode::Echo) },
@@ -344,7 +352,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Abs=> {
+                OpCode::Abs => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -355,7 +363,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Floor=> {
+                OpCode::Floor => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -366,7 +374,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Ceil=> {
+                OpCode::Ceil => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -377,7 +385,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Incr=> {
+                OpCode::Incr => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -388,7 +396,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Decr=> {
+                OpCode::Decr => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -396,6 +404,50 @@ impl Vm {
                         },
                         _ => {
                             self.push(Value::Num(val.num_equiv() - 1.0));
+                        },
+                    }
+                },
+                OpCode::Sin => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::sin(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::sin(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Cos => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::cos(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::cos(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Tan => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::tan(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::tan(val.num_equiv())));
+                        },
+                    }
+                },
+                OpCode::Inv => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(1.0 / *num));
+                        },
+                        _ => {
+                            self.push(Value::Num(1.0 / val.num_equiv()));
                         },
                     }
                 },
