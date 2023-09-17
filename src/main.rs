@@ -1,91 +1,23 @@
 #![allow(clippy::needless_return)]
-use rustyline::error::ReadlineError;
-use rustyline::{DefaultEditor};
 
-
-use rand;
-use rand::seq::SliceRandom;
 use std::fs;
 use clap::{Arg, Command};
-
 
 mod config;
 mod tokenizer;
 mod parser;
 mod units;
 mod vm;
+mod repl;
+
 
 use crate::{
     tokenizer::Tokenizer,
     parser::Parser,
     vm::Vm,
     config::NopeConfig,
+    repl::repl,
 };
-
-use colored::*;
-
-fn print_colored_line(len: usize, c:&str) {
-    print!("  ");
-    for _ in 0..len {
-        print!("{}", c.blue());
-    }
-    println!();
-}
-
-fn print_banner() {
-    let messages: Vec<&str> = vec![
-        "Enjoy!",
-        "You can do it!",
-        "Have fun!",
-        "You are amazing!",
-        "Turbo mode activated!",
-        "All Systems are GO!",
-        "Today is a good day!",
-        "Peace ✌️",
-        "Make something incredible!",
-        "Make something small!",
-        "Make something fun!",
-        "Make something cute!",
-        "Make something cool!",
-    ];
-    let mut rng = rand::thread_rng();
-    let banner = format!(
-        "Welcome to the NOPE repl! {}",
-        messages.choose(&mut rng).expect("should not happen")
-    );
-    println!();
-    print_colored_line(banner.chars().count()+4, "-");
-    println!("  {} {} {}", ":".blue(), banner, ":".blue());
-    print_colored_line(banner.chars().count()+4, "=");
-    println!();
-}
-
-fn repl(vm: &mut Vm) {
-    let mut rl = DefaultEditor::new().expect("could not activate line editor");
-
-    print_banner();
-    loop {
-        let readline = rl.readline(&format!("{}", "> ".blue()));
-        match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_str()).ok();
-                vm.interpret(line);
-            },
-            Err(ReadlineError::Interrupted) => {
-                println!("  {}", "exit (^C)".blue());
-                break
-            },
-            Err(ReadlineError::Eof) => {
-                println!("  {}", "exit (^D)".blue());
-                break
-            },
-            Err(err) => {
-                println!("  {}", format!("Error: {:?}", err).red());
-                break
-            }
-        }
-    }
-}
 
 
 fn main() {

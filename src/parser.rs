@@ -61,6 +61,7 @@ enum ParserState{
     Wip,
     Done,
     Error,
+    Incomplete,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -252,6 +253,10 @@ impl Parser {
         println!();
     }
 
+    pub fn incomplete(&self) -> bool {
+        return self.state == ParserState::Incomplete
+    }
+
     pub fn failed(&self) -> bool {
         return self.tokenizer.failed() || self.parsing_failed();
     }
@@ -405,6 +410,13 @@ impl Parser {
         );
     }
 
+    fn push_incomplete(&mut self, line: usize, col: usize, message: String) {
+        self.state = ParserState::Incomplete;
+        self.errors.push(
+            ParserError { line, col, message, severity:Severity::Critical }
+        );
+    }
+
     fn push_env_value_entry(&mut self, name: String) {
         self.env.push(EnvEntry { name, is_func:false, func_args:vec![] });
     }
@@ -470,7 +482,7 @@ impl Parser {
     }
 
     pub fn parsing_failed(&self) -> bool {
-        return self.state == ParserState::Error;
+        return self.state == ParserState::Error || self.state == ParserState::Incomplete;
     }
 
     fn parse_function_def(&mut self, func_name: Option<&str>) {
@@ -902,7 +914,12 @@ impl Parser {
                 } else {
                     let mut arg_node_indexes: Vec<usize> = vec![];
                     for (arg_index, arg) in env_entry.func_args.iter().enumerate() {
-                        if self.peek_closing_element() {
+                        if self.peek_eof() {
+                            let (vline, vcol) = self.peek_line_col();
+                            self.push_info(line, col, "this function call is missing an argument".to_owned());
+                            self.push_incomplete(vline, vcol, "ERROR: expected argument for function call".to_owned());
+                            return;
+                        } else if self.peek_closing_element() {
                             let (vline, vcol) = self.peek_line_col();
                             self.push_info(line, col, "this function call is missing an argument".to_owned());
                             self.push_error(vline, vcol, "ERROR: expected argument for function call".to_owned());
@@ -990,7 +1007,9 @@ impl Parser {
 
         let (dline, dcol) = self.cur_line_col();  // line col of the dot
 
-        if self.peek_closing_element() {
+        if self.peek_eof() {
+            self.push_incomplete(dline, dcol, "ERROR: expected expression after key access".to_owned());
+        } else if self.peek_closing_element() {
             self.push_error(dline, dcol, "ERROR: expected expression after key access".to_owned());
             return;
         }
@@ -1078,7 +1097,11 @@ impl Parser {
                 if self.parsing_failed() {
                     return;
                 }
-                if !self.peek_rightp() {
+                if self.peek_eof() {
+                    self.push_info(pline, pcol, "unclosed '('".to_owned());
+                    let (line, col) = self.peek_line_col();
+                    self.push_incomplete(line, col, "ERROR: expected closing ')'".to_owned());
+                } else if !self.peek_rightp() {
                     self.push_info(pline, pcol, "unclosed '('".to_owned());
                     let (line, col) = self.peek_line_col();
                     self.push_error(line, col, "ERROR: expected closing ')'".to_owned());
@@ -1558,7 +1581,21 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.1415),
         ]);
-        assert_eq!(parser.state, ParserState::Error);
+        assert_eq!(parser.state, ParserState::Incomplete);
+    }
+
+    #[test]
+    fn test_parse_paren_unclosed_2() {
+        let mut parser = Parser::new(CONFIG, String::from("(add 1 2"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Incomplete);
+    }
+
+    #[test]
+    fn test_parse_paren_unclosed_3() {
+        let mut parser = Parser::new(CONFIG, String::from("(add 1"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Incomplete);
     }
 
     #[test]
@@ -1714,6 +1751,13 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("(print add 1)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_std_func_wrong2_inc() {
+        let mut parser = Parser::new(CONFIG, String::from("print add 1"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Incomplete);
     }
 
     #[test]
