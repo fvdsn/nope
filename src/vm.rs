@@ -6,114 +6,19 @@ use crate::{
         AstNode,
     },
     config::NopeConfig,
+    chunk::{
+        Value,
+        Chunk,
+        Instruction,
+    },
+    gc::{
+        Gc,
+        GcRef,
+    },
 };
 
 use colored::*;
 
-#[derive(PartialEq, Debug, Clone, Copy)]
-enum Value {
-    Null,
-    Void,
-    Boolean(bool),
-    Num(f64),
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Null => false,
-            Value::Void => false,
-            Value::Boolean(value) => *value,
-            Value::Num(num) => *num != 0.0,
-            // _ => true,
-        }
-    }
-    pub fn num_equiv(&self) -> f64 {
-        match self {
-            Value::Null => 0.0,
-            Value::Void => 0.0,
-            Value::Boolean(value) => (*value as i32) as f64,
-            Value::Num(num) => *num,
-        }
-    }
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-enum OpCode {
-    Constant(usize),
-    ConstantNum(f64),
-    Return,
-    Negate,
-    Add,
-    Substract,
-    Multiply,
-    Divide,
-    Random,
-    Print,
-    Echo,
-    Num,
-    Not,
-    Bool,
-    Equal,
-    Greater,
-    Less,
-    Max,
-    Min,
-    Floor,
-    Ceil,
-    Abs,
-    Decr,
-    Incr,
-    Sin,
-    Cos,
-    Tan,
-    Inv,
-    GreaterOrEqual,
-    LessOrEqual,
-    AlmostEqual,
-}
-
-#[derive(PartialEq, Debug, Clone)]
-struct Chunk {
-    code: Vec<OpCode>,
-    constants: Vec<Value>,
-    ast_map: Vec<usize>,
-}
-
-impl Chunk {
-    pub fn new() -> Chunk {
-        return Chunk {
-            code: vec![],
-            constants: vec![],
-            ast_map: vec![],
-        };
-    }
-
-    fn push_constant(&mut self, ast_node_idx: usize, value: Value) {
-        self.constants.push(value);
-        self.code.push(OpCode::Constant(self.constants.len()-1));
-        self.ast_map.push(ast_node_idx);
-    }
-
-    fn push_op(&mut self, ast_node_idx: usize, op: OpCode) {
-        self.code.push(op);
-        self.ast_map.push(ast_node_idx);
-    }
-
-    pub fn pretty_print(&self) {
-        for (idx, op) in self.code.iter().enumerate() {
-            match op {
-                OpCode::Constant(cst_idx) => {
-                    let cst = self.constants[*cst_idx];
-                    println!("{: <8} Constant {:?}", idx, cst);
-                },
-                _ => {
-                    println!("{: <8} {:?}", idx, op);
-                },
-            };
-        }
-    }
-}
 
 pub enum InterpretResult {
     Ok,
@@ -121,9 +26,9 @@ pub enum InterpretResult {
     _RuntimeError,
 }
 
-#[derive(Debug)]
 pub struct Vm {
     config: NopeConfig,
+    gc: Gc,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -133,6 +38,7 @@ pub struct Vm {
 impl Vm {
     pub fn new (config: NopeConfig) -> Vm {
         return Vm {
+            gc: Gc::new(),
             config,
             chunk: Chunk::new(),
             stack: vec![],
@@ -149,13 +55,51 @@ impl Vm {
         self.stack.pop().expect("Empty Stack")
     }
 
-    fn print_val(&self, val: &Value) {
+    fn intern(&mut self, name: String) -> GcRef<String> {
+    //    self.mark_and_sweep();
+        self.gc.intern(name)
+    }
+
+    fn value_to_str(&self, val: &Value) -> String {
         match val {
-            Value::Num(num) => { println!("{}", num); }
-            Value::Null => { println!("null"); }
-            Value::Void => { println!("_"); }
-            Value::Boolean(val)=> { if *val { println!("true"); } else { println!("false")} }
+            Value::Num(num) =>  format!("{}", num),
+            Value::Null => format!("null"),
+            Value::Void => format!("_"),
+            Value::Boolean(val) => {
+                if *val { 
+                    "true".to_string() 
+                } else {
+                    "false".to_string()
+                }
+            },
+            Value::String(str_ref) => {
+                let val = self.gc.deref(*str_ref);
+                val.to_string() 
+            },
         }
+    }
+
+    fn value_to_repr(&self, val: &Value) -> String {
+        match val {
+            Value::Num(num) =>  format!("{}", num),
+            Value::Null => format!("null"),
+            Value::Void => format!("_"),
+            Value::Boolean(val) => {
+                if *val { 
+                    "true".to_string() 
+                } else {
+                    "false".to_string()
+                }
+            },
+            Value::String(str_ref) => {
+                let val = self.gc.deref(*str_ref);
+                format!("\"{}\"", val.replace("\"", "\\\""))
+            },
+        }
+    }
+
+    fn print_val(&self, val: &Value) {
+        println!("{}", self.value_to_str(val))
     }
 
     fn echo_val(&self, val: &Value) {
@@ -165,16 +109,7 @@ impl Vm {
             }
             _ => {
                 println!();
-                match val {
-                    Value::Void => {},
-                    Value::Num(num) => { println!("  {}", format!("{}", num).blue()); },
-                    Value::Null => { println!("  {}", "null".blue()); },
-                    Value::Boolean(val)=> {
-                        println!("  {}",
-                            if *val { "true".blue() } else { "false".blue() }
-                        )
-                    },
-                };
+                println!("   {}", self.value_to_repr(val).blue());
                 println!();
             }
         };
@@ -228,16 +163,20 @@ impl Vm {
     fn compile_node(&mut self, ast: &Vec<AstNode>, node_idx: usize) -> bool {
         match &ast[node_idx] {
             AstNode::Number(_, num) => {
-                self.chunk.push_constant(node_idx, Value::Num(*num));
+                self.chunk.add_constant(node_idx, Value::Num(*num));
             },
             AstNode::Null(_) => {
-                self.chunk.push_constant(node_idx, Value::Null);
+                self.chunk.add_constant(node_idx, Value::Null);
             },
             AstNode::Void(_) => {
-                self.chunk.push_constant(node_idx, Value::Void);
+                self.chunk.add_constant(node_idx, Value::Void);
             },
             AstNode::Boolean(_, val) => {
-                self.chunk.push_constant(node_idx, Value::Boolean(*val));
+                self.chunk.add_constant(node_idx, Value::Boolean(*val));
+            },
+            AstNode::String(_, val) => {
+                let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
+                self.chunk.add_constant(node_idx, Value::String(str_ref));
             },
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
@@ -247,48 +186,52 @@ impl Vm {
                     }
                 }
                 match name.as_str() {
-                    "add" => { self.chunk.push_op(node_idx, OpCode::Add) },
-                    "sub" => { self.chunk.push_op(node_idx, OpCode::Substract) },
-                    "mult" => { self.chunk.push_op(node_idx, OpCode::Multiply) },
-                    "div" => { self.chunk.push_op(node_idx, OpCode::Divide) },
-                    "min" => { self.chunk.push_op(node_idx, OpCode::Min) },
-                    "max" => { self.chunk.push_op(node_idx, OpCode::Max) },
-                    "neg" => { self.chunk.push_op(node_idx, OpCode::Negate) },
-                    "abs" => { self.chunk.push_op(node_idx, OpCode::Abs) },
-                    "floor" => { self.chunk.push_op(node_idx, OpCode::Floor) },
-                    "ceil" => { self.chunk.push_op(node_idx, OpCode::Ceil) },
-                    "decr" => { self.chunk.push_op(node_idx, OpCode::Decr) },
-                    "incr" => { self.chunk.push_op(node_idx, OpCode::Incr) },
-                    "sin" => { self.chunk.push_op(node_idx, OpCode::Sin) },
-                    "cos" => { self.chunk.push_op(node_idx, OpCode::Cos) },
-                    "tan" => { self.chunk.push_op(node_idx, OpCode::Tan) },
-                    "inv" => { self.chunk.push_op(node_idx, OpCode::Inv) },
-                    "random" => { self.chunk.push_op(node_idx, OpCode::Random) },
-                    "print" => { self.chunk.push_op(node_idx, OpCode::Print) },
-                    "echo" => { self.chunk.push_op(node_idx, OpCode::Echo) },
-                    "num" => { self.chunk.push_op(node_idx, OpCode::Num) },
-                    "not" => { self.chunk.push_op(node_idx, OpCode::Not) },
-                    "bool" => { self.chunk.push_op(node_idx, OpCode::Bool) },
-                    "==" => { self.chunk.push_op(node_idx, OpCode::Equal) },
-                    ">" => { self.chunk.push_op(node_idx, OpCode::Greater) },
-                    "<" => { self.chunk.push_op(node_idx, OpCode::Less) },
-                    ">=" => { self.chunk.push_op(node_idx, OpCode::GreaterOrEqual) },
-                    "<=" => { self.chunk.push_op(node_idx, OpCode::LessOrEqual) },
-                    "~=" => { self.chunk.push_op(node_idx, OpCode::AlmostEqual) },
+                    "add" => { self.chunk.write(node_idx, Instruction::Add) },
+                    "sub" => { self.chunk.write(node_idx, Instruction::Substract) },
+                    "mult" => { self.chunk.write(node_idx, Instruction::Multiply) },
+                    "div" => { self.chunk.write(node_idx, Instruction::Divide) },
+                    "min" => { self.chunk.write(node_idx, Instruction::Min) },
+                    "max" => { self.chunk.write(node_idx, Instruction::Max) },
+                    "neg" => { self.chunk.write(node_idx, Instruction::Negate) },
+                    "abs" => { self.chunk.write(node_idx, Instruction::Abs) },
+                    "floor" => { self.chunk.write(node_idx, Instruction::Floor) },
+                    "ceil" => { self.chunk.write(node_idx, Instruction::Ceil) },
+                    "decr" => { self.chunk.write(node_idx, Instruction::Decr) },
+                    "incr" => { self.chunk.write(node_idx, Instruction::Incr) },
+                    "sin" => { self.chunk.write(node_idx, Instruction::Sin) },
+                    "cos" => { self.chunk.write(node_idx, Instruction::Cos) },
+                    "tan" => { self.chunk.write(node_idx, Instruction::Tan) },
+                    "inv" => { self.chunk.write(node_idx, Instruction::Inv) },
+                    "random" => { self.chunk.write(node_idx, Instruction::Random) },
+                    "print" => { self.chunk.write(node_idx, Instruction::Print) },
+                    "echo" => { self.chunk.write(node_idx, Instruction::Echo) },
+                    "num" => { self.chunk.write(node_idx, Instruction::Num) },
+                    "not" => { self.chunk.write(node_idx, Instruction::Not) },
+                    "bool" => { self.chunk.write(node_idx, Instruction::Bool) },
+                    "str" => { self.chunk.write(node_idx, Instruction::Str) },
+                    "upper" => { self.chunk.write(node_idx, Instruction::Upper) },
+                    "lower" => { self.chunk.write(node_idx, Instruction::Lower) },
+                    "trim" => { self.chunk.write(node_idx, Instruction::Trim) },
+                    "==" => { self.chunk.write(node_idx, Instruction::Equal) },
+                    ">" => { self.chunk.write(node_idx, Instruction::Greater) },
+                    "<" => { self.chunk.write(node_idx, Instruction::Less) },
+                    ">=" => { self.chunk.write(node_idx, Instruction::GreaterOrEqual) },
+                    "<=" => { self.chunk.write(node_idx, Instruction::LessOrEqual) },
+                    "~=" => { self.chunk.write(node_idx, Instruction::AlmostEqual) },
                     "!=" => { 
-                        self.chunk.push_op(node_idx, OpCode::Equal);
-                        self.chunk.push_op(node_idx, OpCode::Not);
+                        self.chunk.write(node_idx, Instruction::Equal);
+                        self.chunk.write(node_idx, Instruction::Not);
                     },
                     "flip-coin" => { 
-                        self.chunk.push_op(node_idx, OpCode::Random);
-                        self.chunk.push_op(node_idx, OpCode::ConstantNum(0.5));
-                        self.chunk.push_op(node_idx, OpCode::GreaterOrEqual);
+                        self.chunk.write(node_idx, Instruction::Random);
+                        self.chunk.write(node_idx, Instruction::ConstantNum(0.5));
+                        self.chunk.write(node_idx, Instruction::GreaterOrEqual);
                     },
                     "rand100" => { 
-                        self.chunk.push_op(node_idx, OpCode::Random);
-                        self.chunk.push_op(node_idx, OpCode::ConstantNum(100.0));
-                        self.chunk.push_op(node_idx, OpCode::Multiply);
-                        self.chunk.push_op(node_idx, OpCode::Floor);
+                        self.chunk.write(node_idx, Instruction::Random);
+                        self.chunk.write(node_idx, Instruction::ConstantNum(100.0));
+                        self.chunk.write(node_idx, Instruction::Multiply);
+                        self.chunk.write(node_idx, Instruction::Floor);
                     },
                     _ => { 
                         println!("unknown function {}", name);
@@ -308,9 +251,9 @@ impl Vm {
             if !self.compile_node(ast, ast.len() - 1) {
                 return false;
             }
-            self.chunk.push_op(self.chunk.ast_map[self.chunk.ast_map.len()-1], OpCode::Return);
+            self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Return);
         } else {
-            self.chunk.push_op(0, OpCode::Return);
+            self.chunk.write(0, Instruction::Return);
         }
         return true;
     }
@@ -320,28 +263,28 @@ impl Vm {
             let instr = self.chunk.code[self.ip];
             self.ip += 1;
             match instr {
-                OpCode::Return => {
+                Instruction::Return => {
                     //println!("{:?}", self.pop());
                     return InterpretResult::Ok;
                 },
-                OpCode::Print=> {
+                Instruction::Print=> {
                     self.print_val(&self.stack[self.stack.len() - 1]);
                 },
-                OpCode::Echo=> {
+                Instruction::Echo=> {
                     self.echo_val(&self.stack[self.stack.len() - 1]);
                 },
-                OpCode::Constant(cst_idx) => {
+                Instruction::Constant(cst_idx) => {
                     let cst = self.chunk.constants[cst_idx];
                     self.push(cst);
                 },
-                OpCode::ConstantNum(num)  => {
+                Instruction::ConstantNum(num)  => {
                     self.push(Value::Num(num));
                 },
-                OpCode::Num => {
+                Instruction::Num => {
                     let val = self.pop();
                     self.push(Value::Num(val.num_equiv()));
                 },
-                OpCode::Negate => {
+                Instruction::Negate => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -352,7 +295,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Abs => {
+                Instruction::Abs => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -363,7 +306,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Floor => {
+                Instruction::Floor => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -374,7 +317,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Ceil => {
+                Instruction::Ceil => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -385,7 +328,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Incr => {
+                Instruction::Incr => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -396,7 +339,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Decr => {
+                Instruction::Decr => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -407,7 +350,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Sin => {
+                Instruction::Sin => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -418,7 +361,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Cos => {
+                Instruction::Cos => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -429,7 +372,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Tan => {
+                Instruction::Tan => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -440,7 +383,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Inv => {
+                Instruction::Inv => {
                     let val = self.pop();
                     match &val {
                         Value::Num(num) => {
@@ -451,15 +394,70 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Not => {
+                Instruction::Not => {
                     let val = self.pop();
                     self.push(Value::Boolean(!val.is_truthy()));
                 },
-                OpCode::Bool => {
+                Instruction::Bool => {
                     let val = self.pop();
                     self.push(Value::Boolean(val.is_truthy()));
                 },
-                OpCode::Equal => {
+                Instruction::Str => {
+                    let val = self.pop();
+                    match &val {
+                        Value::String(_) => {
+                            self.push(val);
+                        }
+                        _ => {
+                            let str_val = self.value_to_str(&val);
+                            let ref_val = self.intern(str_val);
+                            self.push(Value::String(ref_val));
+                        }
+                    }
+                },
+                Instruction::Upper => {
+                    let val = self.pop();
+                    match &val {
+
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(*ref_val).to_uppercase();
+                            let ref_val = self.intern(str_val);
+                            self.push(Value::String(ref_val));
+                        }
+                        _ => {
+                            self.push(val);
+                        }
+                    }
+                },
+                Instruction::Lower => {
+                    let val = self.pop();
+                    match &val {
+
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(*ref_val).to_lowercase();
+                            let ref_val = self.intern(str_val);
+                            self.push(Value::String(ref_val));
+                        }
+                        _ => {
+                            self.push(val);
+                        }
+                    }
+                },
+                Instruction::Trim => {
+                    let val = self.pop();
+                    match &val {
+
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(*ref_val).trim();
+                            let ref_val = self.intern(str_val.to_owned());
+                            self.push(Value::String(ref_val));
+                        }
+                        _ => {
+                            self.push(val);
+                        }
+                    }
+                },
+                Instruction::Equal => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -479,7 +477,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Greater => {
+                Instruction::Greater => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -490,7 +488,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::GreaterOrEqual => {
+                Instruction::GreaterOrEqual => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -501,7 +499,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Less => {
+                Instruction::Less => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -512,7 +510,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::LessOrEqual => {
+                Instruction::LessOrEqual => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -523,7 +521,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::AlmostEqual => {
+                Instruction::AlmostEqual => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -534,18 +532,39 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Add => {
+                Instruction::Add => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
                             self.push(Value::Num(val_a + val_b));
                         },
+                        (Value::String(ref_b), Value::String(ref_a)) => {
+                            let str_a = self.gc.deref(ref_a);
+                            let str_b = self.gc.deref(ref_b);
+                            let str_ab = format!("{}{}", str_a, str_b);
+                            let ref_ab = self.intern(str_ab);
+                            self.push(Value::String(ref_ab));
+                        }
+                        (Value::String(ref_b), val_a) => {
+                            let str_a = self.value_to_str(&val_a);
+                            let str_b = self.gc.deref(ref_b);
+                            let str_ab = format!("{}{}", str_a, str_b);
+                            let ref_ab = self.intern(str_ab);
+                            self.push(Value::String(ref_ab));
+                        }
+                        (val_b, Value::String(ref_a)) => {
+                            let str_a = self.gc.deref(ref_a);
+                            let str_b = self.value_to_str(&val_b);
+                            let str_ab = format!("{}{}", str_a, str_b);
+                            let ref_ab = self.intern(str_ab);
+                            self.push(Value::String(ref_ab));
+                        }
                         (b, a) => {
                             self.push(Value::Num(a.num_equiv() + b.num_equiv()));
                         },
                     }
                 },
-                OpCode::Substract => {
+                Instruction::Substract => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -556,7 +575,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Multiply => {
+                Instruction::Multiply => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -567,7 +586,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Divide => {
+                Instruction::Divide => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -578,7 +597,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Min => {
+                Instruction::Min => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -589,7 +608,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Max => {
+                Instruction::Max => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
@@ -600,7 +619,7 @@ impl Vm {
                         },
                     }
                 },
-                OpCode::Random => {
+                Instruction::Random => {
                     let val: f64 = self.rng.gen();
                     self.push(Value::Num(val));
                 },

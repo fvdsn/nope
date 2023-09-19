@@ -7,8 +7,11 @@ mod config;
 mod tokenizer;
 mod parser;
 mod units;
+mod chunk;
 mod vm;
 mod repl;
+mod gc;
+mod objects;
 
 
 use crate::{

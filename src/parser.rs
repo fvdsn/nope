@@ -1194,7 +1194,7 @@ impl Parser {
             // implemented
             "num", "print", "echo", "neg", "return", "not", "bool",
             "floor", "ceil", "abs", "decr", "incr", "sin", "cos", 
-            "tan", "inv",
+            "tan", "inv", "str", "upper", "lower", "trim"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
