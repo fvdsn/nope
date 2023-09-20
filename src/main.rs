@@ -81,11 +81,13 @@ fn main() {
         .after_help("")
         .get_matches();
 
-    let config = NopeConfig {
+    let mut config = NopeConfig {
         debug: m.is_present("debug"),
+        echo_result: false,
     };
 
     if !m.is_present("eval") || !m.is_present("filename") {
+        config.echo_result = true;
         let mut vm = Vm::new(config);
         repl(&mut vm);
         return;

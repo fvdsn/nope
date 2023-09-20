@@ -1223,6 +1223,21 @@ impl Parser {
                 }
             );
         }
+        // |a b c|
+        for name in vec![
+            //implemented
+            "replace",
+        ] {
+            self.env.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, 
+                    func_args: vec![
+                        FunctionArg{is_func: false, func_arity:0, name:"arg1".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"arg2".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"arg3".to_owned()},
+                    ]
+                }
+            );
+        }
     }
 
     pub fn parse(&mut self) {
@@ -1255,6 +1270,7 @@ mod tests {
 
     const CONFIG: NopeConfig = NopeConfig {
         debug: true,
+        echo_result: false,
     };
     
     #[test]

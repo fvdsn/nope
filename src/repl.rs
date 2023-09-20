@@ -66,7 +66,7 @@ impl Validator for InputValidator {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<ValidationResult> {
         use ValidationResult::{Incomplete, Valid};
         let input = ctx.input();
-        let config = NopeConfig{ debug:false };
+        let config = NopeConfig{ debug:false, echo_result:false };
         let mut parser = Parser::new(config, input.to_string());
         parser.parse();
 

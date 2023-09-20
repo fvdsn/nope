@@ -74,6 +74,7 @@ pub enum Instruction {
     GreaterOrEqual,
     LessOrEqual,
     AlmostEqual,
+    Replace,
 }
 
 #[derive(PartialEq, Debug, Clone)]

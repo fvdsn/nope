@@ -216,6 +216,7 @@ impl Vm {
                     "upper" => { self.chunk.write(node_idx, Instruction::Upper) },
                     "lower" => { self.chunk.write(node_idx, Instruction::Lower) },
                     "trim" => { self.chunk.write(node_idx, Instruction::Trim) },
+                    "replace" => { self.chunk.write(node_idx, Instruction::Replace) },
                     "==" => { self.chunk.write(node_idx, Instruction::Equal) },
                     ">" => { self.chunk.write(node_idx, Instruction::Greater) },
                     "<" => { self.chunk.write(node_idx, Instruction::Less) },
@@ -254,6 +255,9 @@ impl Vm {
         if !ast.is_empty() {
             if !self.compile_node(ast, ast.len() - 1) {
                 return false;
+            }
+            if self.config.echo_result {
+                self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Echo);
             }
             self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Return);
         } else {
@@ -491,6 +495,17 @@ impl Vm {
                             self.push(Value::String(ref_err));
                         }
                     }
+                },
+                Instruction::Replace=> {
+                    let text = self.pop();
+                    let str_text = self.value_to_str(&text);
+                    let repl_to = self.pop();
+                    let str_repl_to = self.value_to_str(&repl_to);
+                    let repl_from = self.pop();
+                    let str_repl_from = self.value_to_str(&repl_from);
+                    let res = str_text.replace(&str_repl_from, &str_repl_to);
+                    let ref_res = self.intern(res);
+                    self.push(Value::String(ref_res));
                 },
                 Instruction::Equal => {
                     let ops = (self.pop(), self.pop());
