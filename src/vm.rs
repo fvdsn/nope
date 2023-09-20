@@ -1,5 +1,6 @@
 use rand::Rng;
 use std::time::SystemTime;
+use std::path::Path;
 use crate::{
     parser::{
         Parser,
@@ -209,6 +210,9 @@ impl Vm {
                     "not" => { self.chunk.write(node_idx, Instruction::Not) },
                     "bool" => { self.chunk.write(node_idx, Instruction::Bool) },
                     "str" => { self.chunk.write(node_idx, Instruction::Str) },
+                    "join-paths" => { self.chunk.write(node_idx, Instruction::JoinPaths) },
+                    "read-text" => { self.chunk.write(node_idx, Instruction::ReadTextFileSync) },
+                    "write-text" => { self.chunk.write(node_idx, Instruction::WriteTextFileSync) },
                     "upper" => { self.chunk.write(node_idx, Instruction::Upper) },
                     "lower" => { self.chunk.write(node_idx, Instruction::Lower) },
                     "trim" => { self.chunk.write(node_idx, Instruction::Trim) },
@@ -457,6 +461,37 @@ impl Vm {
                         }
                     }
                 },
+                Instruction::ReadTextFileSync=> {
+                    let val = self.pop();
+                    let str_val = self.value_to_str(&val);
+                    let txt = std::fs::read_to_string(Path::new(&str_val));
+                    match txt {
+                        Ok(txt_str) => {
+                            let ref_txt = self.intern(txt_str);
+                            self.push(Value::String(ref_txt));
+                        },
+                        Err(e) => {
+                            let ref_err = self.intern(e.to_string());
+                            self.push(Value::String(ref_err));
+                        }
+                    }
+                },
+                Instruction::WriteTextFileSync=> {
+                    let text = self.pop();
+                    let str_text = self.value_to_str(&text);
+                    let path = self.pop();
+                    let str_path = self.value_to_str(&path);
+                    let res = std::fs::write(Path::new(&str_path), str_text);
+                    match res {
+                        Ok(_) => {
+                            self.push(Value::Void);
+                        },
+                        Err(e) => {
+                            let ref_err = self.intern(e.to_string());
+                            self.push(Value::String(ref_err));
+                        }
+                    }
+                },
                 Instruction::Equal => {
                     let ops = (self.pop(), self.pop());
                     match ops {
@@ -563,6 +598,17 @@ impl Vm {
                             self.push(Value::Num(a.num_equiv() + b.num_equiv()));
                         },
                     }
+                },
+                Instruction::JoinPaths => {
+                    let b = self.pop();
+                    let a = self.pop();
+                    let str_a = self.value_to_str(&a);
+                    let str_b = self.value_to_str(&b);
+                    let path_a = Path::new(&str_a);
+                    let path_ab = path_a.join(str_b);
+                    let str_ab = path_ab.to_string_lossy().to_string();
+                    let ref_ab = self.intern(str_ab);
+                    self.push(Value::String(ref_ab));
                 },
                 Instruction::Substract => {
                     let ops = (self.pop(), self.pop());

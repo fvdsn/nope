@@ -1194,7 +1194,8 @@ impl Parser {
             // implemented
             "num", "print", "echo", "neg", "return", "not", "bool",
             "floor", "ceil", "abs", "decr", "incr", "sin", "cos", 
-            "tan", "inv", "str", "upper", "lower", "trim"
+            "tan", "inv", "str", "upper", "lower", "trim",
+            "read-text",        
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
@@ -1211,7 +1212,7 @@ impl Parser {
             //implemented
             "add", "sub",
             "<", "<=", ">", ">=", "==", "~=", "!=", "!~=",
-            "max", "min", "mult", "div"
+            "max", "min", "mult", "div", "join-paths", "write-text"
         ] {
             self.env.push(
                 EnvEntry{ name: name.to_owned(), is_func: true, 
