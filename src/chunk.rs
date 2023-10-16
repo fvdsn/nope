@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{
     gc::GcRef,
 };
-
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Value {
@@ -34,10 +35,15 @@ impl Value {
     }
 }
 
+pub type GlobalsTable = HashMap<GcRef<String>, Value>;
+
+
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Instruction {
     Constant(usize),
     ConstantNum(f64),
+    DefineGlobal(usize),
+    GetGlobal(usize),
     Return,
     Negate,
     Add,
@@ -93,14 +99,28 @@ impl Chunk {
         };
     }
 
-    pub fn add_constant(&mut self, ast_node_idx: usize, value: Value) {
+    pub fn add_constant(&mut self, value: Value) -> usize{
         self.constants.push(value);
-        self.code.push(Instruction::Constant(self.constants.len()-1));
+        return self.constants.len() - 1;
+    }
+
+    pub fn write_constant(&mut self, ast_node_idx: usize, value: Value) -> usize{
+        let cst_idx = self.add_constant(value);
+        self.code.push(Instruction::Constant(cst_idx));
         self.ast_map.push(ast_node_idx);
+        return cst_idx;
     }
 
     pub fn read_constant(&self, index: usize) -> Value {
         self.constants[index]
+    }
+
+    pub fn read_constant_string(&self, index: usize) -> GcRef<String>{
+        if let Value::String(s) = self.read_constant(index) {
+            s
+        } else {
+            panic!("Constant is not a String");
+        }
     }
 
     pub fn write(&mut self, ast_node_idx: usize, op: Instruction) {

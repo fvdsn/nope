@@ -11,6 +11,7 @@ use crate::{
         Value,
         Chunk,
         Instruction,
+        GlobalsTable,
     },
     gc::{
         Gc,
@@ -30,6 +31,7 @@ pub enum InterpretResult {
 pub struct Vm {
     config: NopeConfig,
     gc: Gc,
+    globals: GlobalsTable,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -40,6 +42,7 @@ impl Vm {
     pub fn new (config: NopeConfig) -> Vm {
         return Vm {
             gc: Gc::new(),
+            globals: GlobalsTable::new(),
             config,
             chunk: Chunk::new(),
             stack: vec![],
@@ -131,6 +134,7 @@ impl Vm {
         }
         
         if self.config.debug {
+            parser.print();
             println!("compile...");
         }
 
@@ -141,6 +145,7 @@ impl Vm {
         }
 
         if self.config.debug {
+            self.chunk.pretty_print();
             println!("run...\n");
         }
         
@@ -164,20 +169,38 @@ impl Vm {
     fn compile_node(&mut self, ast: &Vec<AstNode>, node_idx: usize) -> bool {
         match &ast[node_idx] {
             AstNode::Number(_, num) => {
-                self.chunk.add_constant(node_idx, Value::Num(*num));
+                self.chunk.write_constant(node_idx, Value::Num(*num));
             },
             AstNode::Null(_) => {
-                self.chunk.add_constant(node_idx, Value::Null);
+                self.chunk.write_constant(node_idx, Value::Null);
             },
             AstNode::Void(_) => {
-                self.chunk.add_constant(node_idx, Value::Void);
+                self.chunk.write_constant(node_idx, Value::Void);
             },
             AstNode::Boolean(_, val) => {
-                self.chunk.add_constant(node_idx, Value::Boolean(*val));
+                self.chunk.write_constant(node_idx, Value::Boolean(*val));
             },
             AstNode::String(_, val) => {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
-                self.chunk.add_constant(node_idx, Value::String(str_ref));
+                self.chunk.write_constant(node_idx, Value::String(str_ref));
+            },
+            AstNode::GlobalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
+                let name_ref = self.gc.intern(name.to_owned());
+                let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
+                if !self.compile_node(ast, *value_expr_node_idx) {
+                    println!("error compiling expression value for global variable {}", name);
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::DefineGlobal(name_cst_idx));
+                if !self.compile_node(ast, *next_expr_node_idx) {
+                    println!("error compile continuation expression for global variable {}", name);
+                    return false;
+                }
+            },
+            AstNode::ValueReference(_, var_name) => {
+                let name_ref = self.gc.intern(var_name.to_owned());
+                let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
+                self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
             },
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
@@ -282,11 +305,26 @@ impl Vm {
                     self.echo_val(&self.stack[self.stack.len() - 1]);
                 },
                 Instruction::Constant(cst_idx) => {
-                    let cst = self.chunk.constants[cst_idx];
+                    let cst = self.chunk.read_constant(cst_idx);
                     self.push(cst);
                 },
                 Instruction::ConstantNum(num)  => {
                     self.push(Value::Num(num));
+                },
+                Instruction::DefineGlobal(cst_idx)  => {
+                    let global_name = self.chunk.read_constant_string(cst_idx);
+                    let value = self.pop();
+                    self.globals.insert(global_name, value);
+                },
+                Instruction::GetGlobal(cst_idx) => {
+                    let global_name = self.chunk.read_constant_string(cst_idx);
+                    match self.globals.get(&global_name) {
+                        Some(&value) => self.push(value),
+                        None => {
+                            let global_name = self.gc.deref(global_name);
+                            panic!("Undefined global {}", global_name);
+                        }
+                    }
                 },
                 Instruction::Num => {
                     let val = self.pop();

@@ -35,6 +35,7 @@ pub enum AstNode {
     Let(usize, String, usize, usize), // String is name of var,
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
+    GlobalLet(usize, String, usize, usize),
     Set(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
     If(usize, usize, usize), // if $cond $expr1 
@@ -50,7 +51,7 @@ pub enum AstNode {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-struct EnvEntry {
+pub struct EnvEntry {
     name: String,
     is_func: bool,
     func_args: Vec<FunctionArg>,
@@ -83,7 +84,7 @@ pub struct Parser {
     config: NopeConfig,
     pub tokenizer: Tokenizer,
     pub ast: Vec<AstNode>,
-    env: Vec<EnvEntry>,
+    pub env: Vec<EnvEntry>,
     block_var_count: usize,
     nextindex: usize,
     index: usize,
@@ -164,6 +165,11 @@ impl Parser {
             },
             AstNode::Let(_, name, val_index, expr_index) => {
                 print!("{}let {} ", " ".repeat(original_indent), name);
+                self._pretty_print_ast(*val_index, indent + 2, true);
+                self._pretty_print_ast(*expr_index, indent, false);
+            },
+            AstNode::GlobalLet(_, name, val_index, expr_index) => {
+                print!("{}let (global) {} ", " ".repeat(original_indent), name);
                 self._pretty_print_ast(*val_index, indent + 2, true);
                 self._pretty_print_ast(*expr_index, indent, false);
             },
@@ -464,7 +470,7 @@ impl Parser {
         }
         return None;
     }
-    
+
     fn cur_ast_node_index(&self) -> usize {
         if self.ast.is_empty() {
             panic!("should not happen");
@@ -588,7 +594,7 @@ impl Parser {
             }
         }
 
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -645,7 +651,7 @@ impl Parser {
                         }
                     }
 
-                    self.parse_expression(false, None);
+                    self.parse_expression(false, false, None);
                     if self.parsing_failed() {
                         return;
                     }
@@ -675,7 +681,7 @@ impl Parser {
                     },
                 };
                 self.nextt();
-                self.parse_expression(false, None);
+                self.parse_expression(false, false, None);
                 if self.parsing_failed() {
                     return;
                 }
@@ -684,7 +690,7 @@ impl Parser {
             } else {
                 let (line, col) = self.peek_line_col();
 
-                self.parse_expression(false, None);
+                self.parse_expression(false, false, None);
                 if self.parsing_failed() {
                     return;
                 }
@@ -716,7 +722,7 @@ impl Parser {
         }
 
         let if_idx = self.index;
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -727,7 +733,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'if'".to_owned());
             return;
         }
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -746,7 +752,7 @@ impl Parser {
         }
 
         let set_idx = self.index;
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -758,7 +764,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'set'".to_owned());
             return;
         }
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -774,7 +780,7 @@ impl Parser {
         }
 
         let do_idx = self.index;
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -788,7 +794,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'do'".to_owned());
             return;
         } else {
-            self.parse_expression(false, None);
+            self.parse_expression(false, false, None);
             if self.parsing_failed() {
                 return;
             }
@@ -805,7 +811,7 @@ impl Parser {
         }
 
         let if_idx = self.index;
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -817,7 +823,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -830,7 +836,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
@@ -839,7 +845,7 @@ impl Parser {
         self.ast.push(AstNode::IfElse(if_idx, cond_idx, expr_idx, expr2_idx));
     }
 
-    fn parse_let(&mut self, code_block: bool) {
+    fn parse_let(&mut self, global_scope: bool, code_block: bool) {
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
             self.push_error(line, col, "ERROR: expected identifier after 'let'".to_owned());
@@ -860,7 +866,7 @@ impl Parser {
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
-                    self.parse_expression(false, Some(var_name));
+                    self.parse_expression(false, false, Some(var_name));
                     if self.parsing_failed() {
                         return;
                     }
@@ -883,7 +889,7 @@ impl Parser {
                         }
                     };
 
-                    self.parse_expression(code_block, None);
+                    self.parse_expression(global_scope, code_block, None);
                     if self.parsing_failed() {
                         return;
                     }
@@ -895,7 +901,11 @@ impl Parser {
                     }
 
                     let expr_idx = self.cur_ast_node_index();
-                    self.ast.push(AstNode::Let(let_idx, var_name.to_owned(), def_idx, expr_idx));
+                    if global_scope {
+                        self.ast.push(AstNode::GlobalLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
+                    } else {
+                        self.ast.push(AstNode::Let(let_idx, var_name.to_owned(), def_idx, expr_idx));
+                    }
                 }
             },
             _ => {
@@ -927,7 +937,7 @@ impl Parser {
                         }
 
                         let (aline, acol) = self.peek_line_col();
-                        self.parse_expression(false, None);
+                        self.parse_expression(false, false, None);
 
                         if self.parsing_failed() {
                             return;
@@ -1014,7 +1024,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, None);
+        self.parse_expression(false, false, None);
 
         if self.parsing_failed() {
             return;
@@ -1023,7 +1033,9 @@ impl Parser {
         self.ast.push(AstNode::StaticKeyAccess(key_name_idx, key_name, self.cur_ast_node_index()));
     }
 
-    fn parse_expression(&mut self, code_block: bool, var_name: Option<&str>) {
+    fn parse_expression(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
+        // - global_scope is true if the expression makes variables declaration part of the global
+        // scope
         // - code_block is true if the expression makes variables declarations part of a multi
         // expression code block
         // - var_name is the name of the variable this expression will be assigned to;
@@ -1064,7 +1076,7 @@ impl Parser {
                 } else if name == "void" || name == "_" || name == "end" {
                     self.ast.push(AstNode::Void(self.index));
                 } else if name == "let" {
-                    self.parse_let(code_block);
+                    self.parse_let(global_scope, code_block);
                 } else if name == "set" {
                     self.parse_set();
                 } else if name == "if" {
@@ -1080,7 +1092,7 @@ impl Parser {
             },
             Token {value: TokenValue::Bang, ..} => {
                 let bang_index = self.index;
-                self.parse_expression(false, None);
+                self.parse_expression(false, false, None);
                 if self.parsing_failed() {
                     return;
                 }
@@ -1093,7 +1105,7 @@ impl Parser {
                     self.nextt();
                     return;
                 }
-                self.parse_expression(false, var_name);
+                self.parse_expression(false, false, var_name);
                 if self.parsing_failed() {
                     return;
                 }
@@ -1126,7 +1138,7 @@ impl Parser {
         }
     }
 
-    fn parse_code_block(&mut self) {
+    fn parse_code_block(&mut self, global_scope: bool) {
         let mut expressions_indexes:Vec<usize> = vec![];
         let code_block_token_index = self.index;
 
@@ -1137,7 +1149,7 @@ impl Parser {
                 break;
             }
 
-            self.parse_expression(true, None);
+            self.parse_expression(global_scope, true, None);
             if self.parsing_failed() {
                 return;
             }
@@ -1256,7 +1268,7 @@ impl Parser {
             println!("build ast...");
         }
 
-        self.parse_code_block();
+        self.parse_code_block(true);
 
         if !self.parsing_failed() {
             self.state = ParserState::Done;
@@ -1632,7 +1644,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
             AstNode::Void(3),
-            AstNode::Let(0, "x".to_owned(), 0, 1)
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -1644,7 +1656,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
             AstNode::ValueReference(3, "x".to_owned()),
-            AstNode::Let(0, "x".to_owned(), 0, 1)
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -1715,8 +1727,8 @@ mod tests {
             AstNode::ValueReference(7, "x".to_owned()),
             AstNode::ValueReference(8, "y".to_owned()),
             AstNode::Array(9, vec![2, 3]),
-            AstNode::Let(3, "y".to_owned(), 1, 4),
-            AstNode::Let(0, "x".to_owned(), 0, 5)
+            AstNode::GlobalLet(3, "y".to_owned(), 1, 4),
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 5)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2137,7 +2149,7 @@ mod tests {
            AstNode::ValueReference(4, "pi".to_string()),
            AstNode::Number(6, 12.0),
            AstNode::DynamicKeyAccess(3, 1, 2),
-           AstNode::Let(0, "pi".to_string(), 0, 3)
+           AstNode::GlobalLet(0, "pi".to_string(), 0, 3)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2322,7 +2334,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
             AstNode::Void(3),
-            AstNode::Let(0, "a".to_owned(), 0, 1),
+            AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
             AstNode::ValueReference(5, "a".to_owned()),
             AstNode::FunctionCall(5, "print".to_owned(), vec![3]),
             AstNode::CodeBlock(0, vec![2, 4])
@@ -2341,5 +2353,20 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("if true let a 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
+    fn test_parse_local_let() {
+        let mut parser = Parser::new(CONFIG, String::from("let a || let x 3 33 _"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Done);
+        assert_eq!(parser.ast, vec![
+           AstNode::Number(6, 3.0),
+           AstNode::Number(7, 33.0),
+           AstNode::Let(4, "x".to_owned(), 0, 1),
+           AstNode::FunctionDef(2, vec![], 2),
+           AstNode::Void(8),
+           AstNode::GlobalLet(0, "a".to_owned(), 3, 4)
+        ]);
     }
 }

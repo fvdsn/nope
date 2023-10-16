@@ -86,7 +86,7 @@ fn main() {
         echo_result: false,
     };
 
-    if !m.is_present("eval") || !m.is_present("filename") {
+    if !(m.is_present("eval") || m.is_present("filename")) {
         config.echo_result = true;
         let mut vm = Vm::new(config);
         repl(&mut vm);
