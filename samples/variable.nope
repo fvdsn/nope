@@ -1,0 +1,3 @@
+let hello upper 'Hello'
+let world upper ', World!'
+echo add hello world

@@ -1,0 +1,37 @@
+
+fun quicksort |A| (
+    fun swap |A i j| (
+        let Ai = [i]A
+        let Aj = [j]A
+        set A[j] = Ai
+        set A[i] = Aj
+    )
+
+    fun partition |A lo hi| (
+        let pivot = [hi]A
+        let i = lo - 1
+        iter range[lo hi - 1] |j| (
+            if [j]A <= pivot (
+                set i = i + 1
+                swap(A, i, j)
+            ) else (
+            )
+        )
+        set i = i + 1
+        swap(A, i, hi)
+        ret i
+    )
+
+    fun sort |A lo hi| (
+        if lo >= 0 and lo < hi (
+            let p = partition(A lo hi)
+            sort(A, lo, p - 1)
+            sort(A, p + 1, hi)
+        )
+    )
+
+    sort(A, 0, len(A) - 1)
+    ret A
+)
+
+print quicksort([9 2 8 4 3 5 7 1 0 6])
