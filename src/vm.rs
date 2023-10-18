@@ -5,6 +5,7 @@ use crate::{
     parser::{
         Parser,
         AstNode,
+        Env,
     },
     config::NopeConfig,
     chunk::{
@@ -29,6 +30,7 @@ pub enum InterpretResult {
 }
 
 pub struct Vm {
+    parsers: Vec<Parser>,
     config: NopeConfig,
     gc: Gc,
     globals: GlobalsTable,
@@ -41,6 +43,7 @@ pub struct Vm {
 impl Vm {
     pub fn new (config: NopeConfig) -> Vm {
         return Vm {
+            parsers: vec![],
             gc: Gc::new(),
             globals: GlobalsTable::new(),
             config,
@@ -49,6 +52,14 @@ impl Vm {
             ip: 0,
             rng: rand::thread_rng(),
         };
+    }
+
+    pub fn get_copy_of_last_env(&self) -> Option<Env> {
+        if self.parsers.is_empty() {
+            return None;
+        } else {
+            return Some(self.parsers[self.parsers.len() - 1].env.clone());
+        }
     }
 
     fn push(&mut self, v: Value) {
@@ -126,14 +137,19 @@ impl Vm {
         
         let mut parser = Parser::new(self.config, code);
 
+        if let Some(env) = self.get_copy_of_last_env() {
+            parser.env = env;
+        }
+
         parser.parse();
 
         if parser.failed() {
             parser.print_errors();
             return InterpretResult::CompileError;
         }
-        
+
         if self.config.debug {
+            parser.env.print();
             parser.print();
             println!("compile...");
         }
@@ -143,6 +159,8 @@ impl Vm {
             self.chunk.pretty_print();
             return InterpretResult::CompileError
         }
+
+        self.parsers.push(parser);
 
         if self.config.debug {
             self.chunk.pretty_print();
@@ -162,6 +180,7 @@ impl Vm {
                 }
             };
         }
+
 
         return res;
     }

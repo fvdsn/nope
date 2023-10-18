@@ -1,6 +1,8 @@
 
 use rand;
 use rand::seq::SliceRandom;
+use std::sync::Arc;
+use std::cell::RefCell;
 
 //use rustyline::error::ReadlineError;
 //use rustyline::{DefaultEditor};
@@ -17,6 +19,7 @@ use rustyline_derive::{Completer, Helper, Highlighter, Hinter };
 use crate::{
     parser::{
         Parser,
+        Env,
     },
     vm::Vm,
     config::NopeConfig,
@@ -60,8 +63,14 @@ fn print_banner() {
     println!();
 }
 
+#[derive(PartialEq, Debug, Clone)]
+struct SharedEnv {
+    env: Env,
+}
+
 #[derive(Completer, Highlighter, Helper, Hinter)]
 struct InputValidator {
+    shared_env: Arc<RefCell<SharedEnv>>,
 }
 
 impl Validator for InputValidator {
@@ -70,6 +79,8 @@ impl Validator for InputValidator {
         let input = ctx.input();
         let config = NopeConfig{ debug:false, echo_result:false };
         let mut parser = Parser::new(config, input.to_string());
+        let shared = (*self.shared_env).clone();
+        parser.env = shared.into_inner().env.clone();
         parser.parse();
 
         let result = if parser.incomplete() {
@@ -85,7 +96,8 @@ impl Validator for InputValidator {
 
 pub fn repl(vm: &mut Vm) {
     let mut rl = Editor::new().expect("could not activate line editor");
-    let h = InputValidator {};
+    let shared_env = Arc::new(RefCell::new(SharedEnv {env: Env::new_with_stdlib()}));
+    let h = InputValidator {shared_env: Arc::clone(&shared_env)};
     rl.set_helper(Some(h));
 
     print_banner();
@@ -95,6 +107,9 @@ pub fn repl(vm: &mut Vm) {
             Ok(line) => {
                 rl.add_history_entry(line.as_str()).ok();
                 vm.interpret(line);
+                if let Some(env) = vm.get_copy_of_last_env() {
+                    shared_env.replace(SharedEnv {env: env.clone()});
+                }
             },
             Err(ReadlineError::Interrupted) => {
                 println!("  {}", "exit (^C)".blue());

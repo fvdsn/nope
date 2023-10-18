@@ -42,6 +42,13 @@ impl Env {
         return env;
     }
 
+    pub fn print(&self) {
+        println!("Env:");
+        for entry in self.entries.iter() {
+            println!("  {}{}", entry.name, if entry.is_func { format!("|{}|", entry.func_args.len()) } else { "".to_string() });
+        }
+    }
+
     fn push_value_entry(&mut self, name: String) {
         self.entries.push(EnvEntry { name, is_func:false, func_args:vec![] });
     }
@@ -1262,11 +1269,13 @@ impl Parser {
             expressions_indexes.push(self.cur_ast_node_index())
         }
 
-        for _ in cur_block_var_count..self.block_var_count {
-            self.env.pop_entry();
+        if !global_scope {
+            for _ in cur_block_var_count..self.block_var_count {
+                self.env.pop_entry();
+            }
+            self.block_var_count = cur_block_var_count;
         }
 
-        self.block_var_count = cur_block_var_count;
 
         if expressions_indexes.len() >= 2 {
             self.ast.push(AstNode::CodeBlock(code_block_token_index, expressions_indexes));
