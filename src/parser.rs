@@ -6,11 +6,7 @@ use crate::tokenizer::TokenizerState;
 use crate::units::convert_unit_to_si;
 use crate::config::NopeConfig;
 
-fn is_reserved_keyword(name: &String) -> bool {
-    return name == "true" ||  name == "false" || name == "null" ||
-        name == "void" || name == "let" || name == "if" ||
-        name == "ife" || name == "do" || name == "end";
-}
+use colored::*;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct FunctionArg {
@@ -19,7 +15,165 @@ pub struct FunctionArg {
     func_arity: usize,
 }
 
-use colored::*;
+#[derive(PartialEq, Debug, Clone)]
+pub struct EnvEntry {
+    name: String,
+    is_func: bool,
+    func_args: Vec<FunctionArg>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct Env {
+    entries: Vec<EnvEntry>,
+    checkpoint: usize,
+}
+
+impl Env {
+    pub fn new() -> Env {
+        return Env {
+            entries:vec![],
+            checkpoint: 0,
+        };
+    }
+
+    pub fn new_with_stdlib() -> Env {
+        let mut env = Env::new();
+        env.set_stdlib();
+        return env;
+    }
+
+    fn push_value_entry(&mut self, name: String) {
+        self.entries.push(EnvEntry { name, is_func:false, func_args:vec![] });
+    }
+
+    fn push_func_entry(&mut self, name: String, args: Vec<FunctionArg>) {
+        if name == "_" {    // _ must keep having the void value
+            self.entries.push(EnvEntry { name, is_func:false, func_args:vec![] });
+        } else {
+            self.entries.push(EnvEntry { name, is_func:true, func_args:args });
+        }
+    }
+
+    fn push_arg_func_entry(&mut self, name: String, argc:usize) {
+        let mut func_args: Vec<FunctionArg> = vec![];
+        for i in 0..argc {
+            func_args.push(FunctionArg {
+                name: format!("arg{}",i+1),
+                is_func: false,
+                func_arity: 0,
+            });
+        }
+        self.entries.push(EnvEntry { name, is_func:true, func_args });
+    }
+
+    fn pop_entry(&mut self) {
+        self.entries.pop();
+    }
+
+    fn get_entry(&self, name: &String) -> Option<EnvEntry> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let mut i = self.entries.len() - 1;
+        loop {
+            let entry = &self.entries[i];
+            if entry.name == *name {
+                let _entry: EnvEntry = entry.clone();
+                return Some(_entry);
+            }
+            if i > 0 {
+                i -= 1;
+            } else {
+                break;
+            }
+        }
+        return None;
+    }
+
+    fn set_stdlib(&mut self) {
+        // |a f:1|
+        self.entries.push(
+            EnvEntry{ name: "iter".to_owned(), is_func: true, 
+                func_args: vec![
+                    FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
+                    FunctionArg{is_func: true,  func_arity:1, name:"iterator".to_owned()},
+                ]
+            }
+        );
+
+        // |f:2 a|
+        for name in ["map", "filter"] {
+            self.entries.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, 
+                    func_args: vec![
+                        FunctionArg{is_func: true,  func_arity:2, name:"iterator".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
+                    ]
+                }
+            );
+        }
+        
+        // ||
+        for name in ["random", "rand100", "flip-coin"] {
+            self.entries.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
+            );
+        }
+
+        // |a|
+        for name in [
+            "range", "increment",
+            "/max", "/min", "/and",
+            "/or", "/eq", "/add", "/mult", "len",
+            // implemented
+            "num", "print", "echo", "neg", "return", "not", "bool",
+            "floor", "ceil", "abs", "decr", "incr", "sin", "cos", 
+            "tan", "inv", "str", "upper", "lower", "trim",
+            "read-text",        
+        ] {
+            self.entries.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, 
+                    func_args: vec![
+                        FunctionArg{is_func: false, func_arity:0, name:"arg".to_owned()},
+                    ]
+                }
+            );
+        }
+        // |a b|
+        for name in vec![
+            "and", "or", "eq", "neq", "mod",
+            "exp",
+            //implemented
+            "add", "sub",
+            "<", "<=", ">", ">=", "==", "~=", "!=", "!~=",
+            "max", "min", "mult", "div", "join-paths", "write-text"
+        ] {
+            self.entries.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, 
+                    func_args: vec![
+                        FunctionArg{is_func: false, func_arity:0, name:"arg1".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"arg2".to_owned()},
+                    ]
+                }
+            );
+        }
+        // |a b c|
+        for name in vec![
+            //implemented
+            "replace",
+        ] {
+            self.entries.push(
+                EnvEntry{ name: name.to_owned(), is_func: true, 
+                    func_args: vec![
+                        FunctionArg{is_func: false, func_arity:0, name:"arg1".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"arg2".to_owned()},
+                        FunctionArg{is_func: false, func_arity:0, name:"arg3".to_owned()},
+                    ]
+                }
+            );
+        }
+    }
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
@@ -50,13 +204,6 @@ pub enum AstNode {
     CodeBlock(usize, Vec<usize>),
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct EnvEntry {
-    name: String,
-    is_func: bool,
-    func_args: Vec<FunctionArg>,
-}
-
 #[derive(PartialEq, Debug)]
 enum ParserState{
     Wip,
@@ -84,12 +231,18 @@ pub struct Parser {
     config: NopeConfig,
     pub tokenizer: Tokenizer,
     pub ast: Vec<AstNode>,
-    pub env: Vec<EnvEntry>,
+    pub env: Env,
     block_var_count: usize,
     nextindex: usize,
     index: usize,
     state: ParserState,
     errors: Vec<ParserError>,
+}
+
+fn is_reserved_keyword(name: &String) -> bool {
+    return name == "true" ||  name == "false" || name == "null" ||
+        name == "void" || name == "let" || name == "if" ||
+        name == "ife" || name == "do" || name == "end";
 }
 
 impl Parser {
@@ -98,7 +251,7 @@ impl Parser {
             config,
             tokenizer: Tokenizer::new(source),
             ast: vec![],
-            env: vec![],
+            env: Env::new_with_stdlib(),
             nextindex: 0,
             block_var_count: 0,
             index: 0,
@@ -423,54 +576,6 @@ impl Parser {
         );
     }
 
-    fn push_env_value_entry(&mut self, name: String) {
-        self.env.push(EnvEntry { name, is_func:false, func_args:vec![] });
-    }
-
-    fn push_env_func_entry(&mut self, name: String, args: Vec<FunctionArg>) {
-        if name == "_" {    // _ must keep having the void value
-            self.env.push(EnvEntry { name, is_func:false, func_args:vec![] });
-        } else {
-            self.env.push(EnvEntry { name, is_func:true, func_args:args });
-        }
-    }
-
-    fn push_env_arg_func_entry(&mut self, name: String, argc:usize) {
-        let mut func_args: Vec<FunctionArg> = vec![];
-        for i in 0..argc {
-            func_args.push(FunctionArg {
-                name: format!("arg{}",i+1),
-                is_func: false,
-                func_arity: 0,
-            });
-        }
-        self.env.push(EnvEntry { name, is_func:true, func_args });
-    }
-
-    fn pop_env_entry(&mut self) {
-        self.env.pop();
-    }
-
-    fn get_env_entry(&self, name: &String) -> Option<EnvEntry> {
-        if self.env.is_empty() {
-            return None;
-        }
-        let mut i = self.env.len() - 1;
-        loop {
-            let entry = &self.env[i];
-            if entry.name == *name {
-                let _entry: EnvEntry = entry.clone();
-                return Some(_entry);
-            }
-            if i > 0 {
-                i -= 1;
-            } else {
-                break;
-            }
-        }
-        return None;
-    }
-
     fn cur_ast_node_index(&self) -> usize {
         if self.ast.is_empty() {
             panic!("should not happen");
@@ -582,15 +687,15 @@ impl Parser {
         // if we have a name for the function, push a reference to it in the environment
         // to allow recursion
         if let Some(name) = func_name {
-            self.push_env_func_entry(name.to_string(), func_args.clone());
+            self.env.push_func_entry(name.to_string(), func_args.clone());
         }
 
         // create an environment entry for each function argument
         for arg in &func_args {
             if arg.is_func {
-                self.push_env_arg_func_entry(arg.name.clone(), arg.func_arity);
+                self.env.push_arg_func_entry(arg.name.clone(), arg.func_arity);
             } else {
-                self.push_env_value_entry(arg.name.clone());
+                self.env.push_value_entry(arg.name.clone());
             }
         }
 
@@ -600,11 +705,11 @@ impl Parser {
         }
 
         for _ in &func_args {
-            self.pop_env_entry();
+            self.env.pop_entry();
         }
 
         if func_name.is_some() {
-            self.pop_env_entry();
+            self.env.pop_entry();
         }
 
         self.ast.push(AstNode::FunctionDef(func_token_index, func_args, self.cur_ast_node_index()));
@@ -882,10 +987,10 @@ impl Parser {
 
                     match value_node {
                         AstNode::FunctionDef(_, args,_) => {
-                            self.push_env_func_entry(var_name.clone(), args.clone());
+                            self.env.push_func_entry(var_name.clone(), args.clone());
                         }
                         _ => {
-                            self.push_env_value_entry(var_name.clone());
+                            self.env.push_value_entry(var_name.clone());
                         }
                     };
 
@@ -897,7 +1002,7 @@ impl Parser {
                     if code_block {
                         self.block_var_count += 1;
                     } else {
-                        self.pop_env_entry();
+                        self.env.pop_entry();
                     }
 
                     let expr_idx = self.cur_ast_node_index();
@@ -917,7 +1022,7 @@ impl Parser {
     fn parse_func_call(&mut self, name:String) {
         let (line, col) = self.cur_line_col();
         let mut uses_commas = false;
-        match self.get_env_entry(&name) {
+        match self.env.get_entry(&name) {
             Some(env_entry) => {
                 if !env_entry.is_func {
                     self.ast.push(AstNode::ValueReference(self.index, name));
@@ -1158,7 +1263,7 @@ impl Parser {
         }
 
         for _ in cur_block_var_count..self.block_var_count {
-            self.pop_env_entry();
+            self.env.pop_entry();
         }
 
         self.block_var_count = cur_block_var_count;
@@ -1168,89 +1273,6 @@ impl Parser {
         }
     }
 
-    fn set_stdlib(&mut self) {
-        // |a f:1|
-        self.env.push(
-            EnvEntry{ name: "iter".to_owned(), is_func: true, 
-                func_args: vec![
-                    FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
-                    FunctionArg{is_func: true,  func_arity:1, name:"iterator".to_owned()},
-                ]
-            }
-        );
-
-        // |f:2 a|
-        for name in ["map", "filter"] {
-            self.env.push(
-                EnvEntry{ name: name.to_owned(), is_func: true, 
-                    func_args: vec![
-                        FunctionArg{is_func: true,  func_arity:2, name:"iterator".to_owned()},
-                        FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
-                    ]
-                }
-            );
-        }
-        
-        // ||
-        for name in ["random", "rand100", "flip-coin"] {
-            self.env.push(
-                EnvEntry{ name: name.to_owned(), is_func: true, func_args: vec![]}
-            );
-        }
-
-        // |a|
-        for name in [
-            "range", "increment",
-            "/max", "/min", "/and",
-            "/or", "/eq", "/add", "/mult", "len",
-            // implemented
-            "num", "print", "echo", "neg", "return", "not", "bool",
-            "floor", "ceil", "abs", "decr", "incr", "sin", "cos", 
-            "tan", "inv", "str", "upper", "lower", "trim",
-            "read-text",        
-        ] {
-            self.env.push(
-                EnvEntry{ name: name.to_owned(), is_func: true, 
-                    func_args: vec![
-                        FunctionArg{is_func: false, func_arity:0, name:"arg".to_owned()},
-                    ]
-                }
-            );
-        }
-        // |a b|
-        for name in vec![
-            "and", "or", "eq", "neq", "mod",
-            "exp",
-            //implemented
-            "add", "sub",
-            "<", "<=", ">", ">=", "==", "~=", "!=", "!~=",
-            "max", "min", "mult", "div", "join-paths", "write-text"
-        ] {
-            self.env.push(
-                EnvEntry{ name: name.to_owned(), is_func: true, 
-                    func_args: vec![
-                        FunctionArg{is_func: false, func_arity:0, name:"arg1".to_owned()},
-                        FunctionArg{is_func: false, func_arity:0, name:"arg2".to_owned()},
-                    ]
-                }
-            );
-        }
-        // |a b c|
-        for name in vec![
-            //implemented
-            "replace",
-        ] {
-            self.env.push(
-                EnvEntry{ name: name.to_owned(), is_func: true, 
-                    func_args: vec![
-                        FunctionArg{is_func: false, func_arity:0, name:"arg1".to_owned()},
-                        FunctionArg{is_func: false, func_arity:0, name:"arg2".to_owned()},
-                        FunctionArg{is_func: false, func_arity:0, name:"arg3".to_owned()},
-                    ]
-                }
-            );
-        }
-    }
 
     pub fn parse(&mut self) {
         if self.config.debug {
@@ -1261,8 +1283,6 @@ impl Parser {
         if self.tokenizer.failed() {
             return;
         }
-
-        self.set_stdlib();
 
         if self.config.debug {
             println!("build ast...");
