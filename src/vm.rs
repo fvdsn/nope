@@ -298,7 +298,7 @@ impl Vm {
             if !self.compile_node(ast, ast.len() - 1) {
                 return false;
             }
-            if self.config.echo_result {
+            if self.config.echo_result && !self.chunk.is_last_instruction_echo() {
                 self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Echo);
             }
             self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Return);

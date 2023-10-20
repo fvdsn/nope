@@ -141,4 +141,12 @@ impl Chunk {
             };
         }
     }
+
+    pub fn is_last_instruction_echo(&self) -> bool {
+        if self.code.is_empty() {
+            return false;
+        } else {
+            return matches!(self.code[self.code.len()-1], Instruction::Echo);
+        }
+    }
 }
