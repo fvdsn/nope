@@ -5,6 +5,8 @@ use crate::{
     parser::{
         Parser,
         AstNode,
+    },
+    penv::{
         Env,
     },
     config::NopeConfig,

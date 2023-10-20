@@ -6,6 +6,7 @@ use clap::{Arg, Command};
 mod config;
 mod tokenizer;
 mod parser;
+mod penv;
 mod units;
 mod chunk;
 mod vm;

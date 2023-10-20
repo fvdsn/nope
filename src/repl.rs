@@ -17,10 +17,8 @@ use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter };
 
 use crate::{
-    parser::{
-        Parser,
-        Env,
-    },
+    penv::Env,
+    parser::Parser,
     vm::Vm,
     config::NopeConfig,
 };
