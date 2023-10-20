@@ -983,12 +983,7 @@ impl Parser {
                         return;
                     }
                     let def_idx = self.cur_ast_node_index();
-                    if self.peek_closing_element() {
-                        let (vline, vcol) = self.peek_line_col();
-                        self.push_info(line, col, "this variable definition doesn't have an expression".to_owned());
-                        self.push_error(vline, vcol, "ERROR: expected expression in which to use the defined variable".to_owned());
-                        return;
-                    }
+
 
                     let value_node = &self.cur_ast_node();
 
@@ -1001,14 +996,18 @@ impl Parser {
                         }
                     };
 
-                    self.parse_expression(global_scope, code_block, None);
-                    if self.parsing_failed() {
-                        return;
+                    if !self.peek_closing_element() {
+                        self.parse_expression(global_scope, code_block, None);
+                        if self.parsing_failed() {
+                            return;
+                        }
+                    } else {
+                        self.ast.push(AstNode::Void(let_idx));
                     }
 
                     if code_block {
                         self.block_var_count += 1;
-                    } else {
+                    } else if !global_scope {
                         self.env.pop_entry();
                     }
 
@@ -1705,9 +1704,11 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("let x 3"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
+            AstNode::Number(2, 3.0), 
+            AstNode::Void(0),
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 1),
         ]);
-        assert_eq!(parser.state, ParserState::Error);
+        assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
