@@ -19,6 +19,7 @@ use rustyline_derive::{Completer, Helper, Highlighter, Hinter };
 use crate::{
     penv::Env,
     parser::Parser,
+    stdlib::Stdlib,
     vm::Vm,
     config::NopeConfig,
 };
@@ -94,7 +95,10 @@ impl Validator for InputValidator {
 
 pub fn repl(vm: &mut Vm) {
     let mut rl = Editor::new().expect("could not activate line editor");
-    let shared_env = Arc::new(RefCell::new(SharedEnv {env: Env::new_with_stdlib()}));
+    let mut env = Env::new();
+    let stdlib = Stdlib::new();
+    stdlib.add_definitions_to_env(&mut env);
+    let shared_env = Arc::new(RefCell::new(SharedEnv {env:env}));
     let h = InputValidator {shared_env: Arc::clone(&shared_env)};
     rl.set_helper(Some(h));
 

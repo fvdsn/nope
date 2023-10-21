@@ -5,6 +5,7 @@ use crate::tokenizer::TokenValue;
 use crate::tokenizer::TokenizerState;
 use crate::units::convert_unit_to_si;
 use crate::config::NopeConfig;
+use crate::stdlib::Stdlib;
 use crate::penv::{
     FunctionArg,
     Env,
@@ -84,11 +85,15 @@ fn is_reserved_keyword(name: &String) -> bool {
 
 impl Parser {
     pub fn new(config: NopeConfig, source: String) -> Parser {
+        let mut env = Env::new();
+        let stdlib = Stdlib::new();
+        stdlib.add_definitions_to_env(&mut env);
+
         return Parser{
             config,
+            env,
             tokenizer: Tokenizer::new(source),
             ast: vec![],
-            env: Env::new_with_stdlib(),
             nextindex: 0,
             block_var_count: 0,
             index: 0,

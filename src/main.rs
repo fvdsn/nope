@@ -7,6 +7,7 @@ mod config;
 mod tokenizer;
 mod parser;
 mod penv;
+mod stdlib;
 mod units;
 mod chunk;
 mod vm;
