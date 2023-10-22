@@ -83,8 +83,8 @@ impl Vm {
     fn value_to_str(&self, val: &Value) -> String {
         match val {
             Value::Num(num) =>  format!("{}", num),
-            Value::Null => format!("null"),
-            Value::Void => format!("_"),
+            Value::Null => "null".to_string(),
+            Value::Void => "_".to_string(),
             Value::Boolean(val) => {
                 if *val { 
                     "true".to_string() 
@@ -102,8 +102,8 @@ impl Vm {
     fn value_to_repr(&self, val: &Value) -> String {
         match val {
             Value::Num(num) =>  format!("{}", num),
-            Value::Null => format!("null"),
-            Value::Void => format!("_"),
+            Value::Null => "null".to_string(),
+            Value::Void => "_".to_string(),
             Value::Boolean(val) => {
                 if *val { 
                     "true".to_string() 
@@ -113,7 +113,7 @@ impl Vm {
             },
             Value::String(str_ref) => {
                 let val = self.gc.deref(*str_ref);
-                format!("\"{}\"", val.replace("\"", "\\\""))
+                format!("\"{}\"", val.replace('\"', "\\\""))
             },
         }
     }
@@ -236,7 +236,7 @@ impl Vm {
                 match self.stdlib.get_function_instructions(name) {
                     Some(instructions) => {
                         for instruction in instructions {
-                            self.chunk.write(node_idx, instruction.clone());
+                            self.chunk.write(node_idx, *instruction);
                         }
                     },
                     None => {

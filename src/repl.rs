@@ -1,7 +1,7 @@
 
-use rand;
+
 use rand::seq::SliceRandom;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::cell::RefCell;
 
 //use rustyline::error::ReadlineError;
@@ -69,7 +69,7 @@ struct SharedEnv {
 
 #[derive(Completer, Highlighter, Helper, Hinter)]
 struct InputValidator {
-    shared_env: Arc<RefCell<SharedEnv>>,
+    shared_env: Rc<RefCell<SharedEnv>>,
 }
 
 impl Validator for InputValidator {
@@ -98,8 +98,8 @@ pub fn repl(vm: &mut Vm) {
     let mut env = Env::new();
     let stdlib = Stdlib::new();
     stdlib.add_definitions_to_env(&mut env);
-    let shared_env = Arc::new(RefCell::new(SharedEnv {env:env}));
-    let h = InputValidator {shared_env: Arc::clone(&shared_env)};
+    let shared_env = Rc::new(RefCell::new(SharedEnv {env}));
+    let h = InputValidator {shared_env: Rc::clone(&shared_env)};
     rl.set_helper(Some(h));
 
     print_banner();
