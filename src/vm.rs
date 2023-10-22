@@ -9,6 +9,7 @@ use crate::{
     penv::{
         Env,
     },
+    stdlib::Stdlib,
     config::NopeConfig,
     chunk::{
         Value,
@@ -35,6 +36,7 @@ pub struct Vm {
     parsers: Vec<Parser>,
     config: NopeConfig,
     gc: Gc,
+    stdlib: Stdlib,
     globals: GlobalsTable,
     chunk: Chunk,
     stack: Vec<Value>,
@@ -48,6 +50,7 @@ impl Vm {
             parsers: vec![],
             gc: Gc::new(),
             globals: GlobalsTable::new(),
+            stdlib: Stdlib::new(),
             config,
             chunk: Chunk::new(),
             stack: vec![],
@@ -230,61 +233,15 @@ impl Vm {
                         return false;
                     }
                 }
-                match name.as_str() {
-                    "add" => { self.chunk.write(node_idx, Instruction::Add) },
-                    "sub" => { self.chunk.write(node_idx, Instruction::Substract) },
-                    "mult" => { self.chunk.write(node_idx, Instruction::Multiply) },
-                    "div" => { self.chunk.write(node_idx, Instruction::Divide) },
-                    "min" => { self.chunk.write(node_idx, Instruction::Min) },
-                    "max" => { self.chunk.write(node_idx, Instruction::Max) },
-                    "neg" => { self.chunk.write(node_idx, Instruction::Negate) },
-                    "abs" => { self.chunk.write(node_idx, Instruction::Abs) },
-                    "floor" => { self.chunk.write(node_idx, Instruction::Floor) },
-                    "ceil" => { self.chunk.write(node_idx, Instruction::Ceil) },
-                    "decr" => { self.chunk.write(node_idx, Instruction::Decr) },
-                    "incr" => { self.chunk.write(node_idx, Instruction::Incr) },
-                    "sin" => { self.chunk.write(node_idx, Instruction::Sin) },
-                    "cos" => { self.chunk.write(node_idx, Instruction::Cos) },
-                    "tan" => { self.chunk.write(node_idx, Instruction::Tan) },
-                    "inv" => { self.chunk.write(node_idx, Instruction::Inv) },
-                    "random" => { self.chunk.write(node_idx, Instruction::Random) },
-                    "print" => { self.chunk.write(node_idx, Instruction::Print) },
-                    "echo" => { self.chunk.write(node_idx, Instruction::Echo) },
-                    "num" => { self.chunk.write(node_idx, Instruction::Num) },
-                    "not" => { self.chunk.write(node_idx, Instruction::Not) },
-                    "bool" => { self.chunk.write(node_idx, Instruction::Bool) },
-                    "str" => { self.chunk.write(node_idx, Instruction::Str) },
-                    "join-paths" => { self.chunk.write(node_idx, Instruction::JoinPaths) },
-                    "read-text" => { self.chunk.write(node_idx, Instruction::ReadTextFileSync) },
-                    "write-text" => { self.chunk.write(node_idx, Instruction::WriteTextFileSync) },
-                    "upper" => { self.chunk.write(node_idx, Instruction::Upper) },
-                    "lower" => { self.chunk.write(node_idx, Instruction::Lower) },
-                    "trim" => { self.chunk.write(node_idx, Instruction::Trim) },
-                    "replace" => { self.chunk.write(node_idx, Instruction::Replace) },
-                    "==" => { self.chunk.write(node_idx, Instruction::Equal) },
-                    ">" => { self.chunk.write(node_idx, Instruction::Greater) },
-                    "<" => { self.chunk.write(node_idx, Instruction::Less) },
-                    ">=" => { self.chunk.write(node_idx, Instruction::GreaterOrEqual) },
-                    "<=" => { self.chunk.write(node_idx, Instruction::LessOrEqual) },
-                    "~=" => { self.chunk.write(node_idx, Instruction::AlmostEqual) },
-                    "!=" => { 
-                        self.chunk.write(node_idx, Instruction::Equal);
-                        self.chunk.write(node_idx, Instruction::Not);
+                match self.stdlib.get_function_instructions(name) {
+                    Some(instructions) => {
+                        for instruction in instructions {
+                            self.chunk.write(node_idx, instruction.clone());
+                        }
                     },
-                    "flip-coin" => { 
-                        self.chunk.write(node_idx, Instruction::Random);
-                        self.chunk.write(node_idx, Instruction::ConstantNum(0.5));
-                        self.chunk.write(node_idx, Instruction::GreaterOrEqual);
-                    },
-                    "rand100" => { 
-                        self.chunk.write(node_idx, Instruction::Random);
-                        self.chunk.write(node_idx, Instruction::ConstantNum(100.0));
-                        self.chunk.write(node_idx, Instruction::Multiply);
-                        self.chunk.write(node_idx, Instruction::Floor);
-                    },
-                    _ => { 
-                        println!("unknown function {}", name);
-                        return false; 
+                    None => {
+                        println!("error compiling function {}, not implemented", name);
+                        return false;
                     }
                 };
             },
