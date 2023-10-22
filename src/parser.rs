@@ -84,11 +84,7 @@ fn is_reserved_keyword(name: &String) -> bool {
 }
 
 impl Parser {
-    pub fn new(config: NopeConfig, source: String) -> Parser {
-        let mut env = Env::new();
-        let stdlib = Stdlib::new();
-        stdlib.add_definitions_to_env(&mut env);
-
+    pub fn new_with_env(config: NopeConfig, env: Env, source: String) -> Parser {
         return Parser{
             config,
             env,
@@ -100,6 +96,12 @@ impl Parser {
             state: ParserState::Wip,
             errors: vec![],
         };
+    }
+
+    pub fn new(config: NopeConfig, source: String) -> Parser {
+        let stdlib = Stdlib::new();
+
+        return Parser::new_with_env(config, stdlib.make_env(), source);
     }
 
     pub fn print(&self) {

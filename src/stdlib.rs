@@ -169,4 +169,10 @@ impl Stdlib {
             return None;
         }
     }
+
+    pub fn make_env(&self) -> Env {
+        let mut env = Env::new();
+        self.add_definitions_to_env(&mut env);
+        return env;
+    }
 }

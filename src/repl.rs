@@ -77,9 +77,12 @@ impl Validator for InputValidator {
         use ValidationResult::{Incomplete, Valid};
         let input = ctx.input();
         let config = NopeConfig{ debug:false, echo_result:false };
-        let mut parser = Parser::new(config, input.to_string());
         let shared = (*self.shared_env).clone();
-        parser.env = shared.into_inner().env.clone();
+        let mut parser = Parser::new_with_env(
+            config,
+            shared.into_inner().env.clone(),
+            input.to_string()
+        );
         parser.parse();
 
         let result = if parser.incomplete() {
@@ -95,9 +98,8 @@ impl Validator for InputValidator {
 
 pub fn repl(vm: &mut Vm) {
     let mut rl = Editor::new().expect("could not activate line editor");
-    let mut env = Env::new();
     let stdlib = Stdlib::new();
-    stdlib.add_definitions_to_env(&mut env);
+    let env = stdlib.make_env();
     let shared_env = Rc::new(RefCell::new(SharedEnv {env}));
     let h = InputValidator {shared_env: Rc::clone(&shared_env)};
     rl.set_helper(Some(h));

@@ -140,11 +140,13 @@ impl Vm {
             println!("create parser...");
         }
         
-        let mut parser = Parser::new(self.config, code);
+        let env = if let Some(env) = self.get_copy_of_last_env() {
+            env
+        } else {
+            self.stdlib.make_env()
+        };
 
-        if let Some(env) = self.get_copy_of_last_env() {
-            parser.env = env;
-        }
+        let mut parser = Parser::new_with_env(self.config, env, code);
 
         parser.parse();
 
