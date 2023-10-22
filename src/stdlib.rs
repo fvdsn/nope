@@ -45,6 +45,14 @@ impl Stdlib {
             Instruction::ConstantNum(0.5),
             Instruction::GreaterOrEqual,
         ]);
+        for num in [4, 6, 8, 10, 12, 20, 100] {
+            def_zero_arg(&format!("d{}", num), vec![
+                Instruction::Random,
+                Instruction::ConstantNum(f64::from(num)),
+                Instruction::Multiply,
+                Instruction::Ceil,
+            ]);
+        }
 
         let one_arg_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
