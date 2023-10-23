@@ -69,6 +69,7 @@ pub enum Instruction {
     Incr,
     Sin,
     Cos,
+    Acos,
     Tan,
     Inv,
     Str,
@@ -81,6 +82,7 @@ pub enum Instruction {
     LessOrEqual,
     AlmostEqual,
     Replace,
+    Silence,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -142,11 +144,12 @@ impl Chunk {
         }
     }
 
-    pub fn is_last_instruction_echo(&self) -> bool {
+    pub fn is_last_instruction_echo_or_print(&self) -> bool {
         if self.code.is_empty() {
             return false;
         } else {
-            return matches!(self.code[self.code.len()-1], Instruction::Echo);
+            return matches!(self.code[self.code.len()-1], Instruction::Echo) ||
+                   matches!(self.code[self.code.len()-1], Instruction::Print);
         }
     }
 }

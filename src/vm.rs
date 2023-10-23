@@ -259,7 +259,7 @@ impl Vm {
             if !self.compile_node(ast, ast.len() - 1) {
                 return false;
             }
-            if self.config.echo_result && !self.chunk.is_last_instruction_echo() {
+            if self.config.echo_result && !self.chunk.is_last_instruction_echo_or_print() {
                 self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Echo);
             }
             self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Return);
@@ -277,6 +277,10 @@ impl Vm {
                 Instruction::Return => {
                     //println!("{:?}", self.pop());
                     return InterpretResult::Ok;
+                },
+                Instruction::Silence => {
+                    self.pop();
+                    self.push(Value::Void);
                 },
                 Instruction::Print=> {
                     self.print_val(&self.stack[self.stack.len() - 1]);
@@ -395,6 +399,17 @@ impl Vm {
                         },
                         _ => {
                             self.push(Value::Num(f64::cos(val.num_equiv())));
+                        },
+                    }
+                },
+                Instruction::Acos => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(f64::acos(*num)));
+                        },
+                        _ => {
+                            self.push(Value::Num(f64::acos(val.num_equiv())));
                         },
                     }
                 },

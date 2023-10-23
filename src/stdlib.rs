@@ -76,6 +76,7 @@ impl Stdlib {
         def_one_arg("floor",  Instruction::Floor);
         def_one_arg("ceil",   Instruction::Ceil);
         def_one_arg("abs",    Instruction::Abs);
+        def_one_arg("acos",   Instruction::Acos);
         def_one_arg("decr",   Instruction::Decr);
         def_one_arg("incr",   Instruction::Incr);
         def_one_arg("sin",    Instruction::Sin);
@@ -86,6 +87,7 @@ impl Stdlib {
         def_one_arg("upper",  Instruction::Upper);
         def_one_arg("lower",  Instruction::Lower);
         def_one_arg("trim",   Instruction::Trim);
+        def_one_arg("shh",    Instruction::Silence);
         def_one_arg("read-text", Instruction::ReadTextFileSync);
 
         let two_args_func = vec![
