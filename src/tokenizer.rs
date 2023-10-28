@@ -14,6 +14,7 @@ pub enum TokenValue {
     Number(f64, Option<String>),
     String(String),
     Name(String),
+    Operator(String),
     Comment(String),
 }
 
@@ -58,6 +59,10 @@ fn is_separator(c:char) -> bool {
         || c == '(' || c == ')';
 }
 
+fn is_operator(c:char) -> bool {
+    return c == '+' || c == '*' || c == '/' || c == '=' 
+}
+
 fn is_dashstr_separator(c:char) -> bool {
     return c == ':' || c == '[' || c == ']' || c == ',' || c == '(' || c == ')';
 }
@@ -74,9 +79,8 @@ fn is_num_spacer(c:char) -> bool {
 }
 
 fn is_namechar(c:char) -> bool {
-    return !is_wp(c) && !is_separator(c);
+    return !is_wp(c) && !is_separator(c) && !is_operator(c);
 }
-
 
 fn is_digit(c:char) -> bool {
     return c.is_ascii_digit();
@@ -88,8 +92,12 @@ fn is_alpha(c:char) -> bool {
 
 fn is_unit(c:char) -> bool {
     // kg, cm, m3, cu.in
-    return c.is_alphabetic() || c.is_ascii_digit() || c == '.';
+    return !is_operator(c) && (c.is_alphabetic() || c.is_ascii_digit() || c == '.');
 }
+
+const OPERATORS: [&str; 4] = [
+    "+", "*", "/", "==",
+];
 
 impl Tokenizer {
     pub fn new(source: String) -> Tokenizer {
@@ -161,6 +169,30 @@ impl Tokenizer {
         }
     }
 
+    fn match_and_push_operator(&mut self) -> bool {
+        if self.index >= self.chars.len() {
+            return false;
+        } else {
+            for operator in OPERATORS {
+                let mut matches = true;
+                for (i, c) in operator.chars().enumerate() {
+                    if c != self.chars[self.index + i] {
+                        matches = false;
+                        break;
+                    }
+                }
+                if matches {
+                    self.push_token(TokenValue::Operator(operator.to_string()));
+                    for _ in 0..operator.len()-1 {
+                        self.nextc();
+                    }
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     fn match_and_push_number_token(&mut self, token: &str, value:TokenValue) -> bool {
         if token.len() + self.index > self.chars.len() {
             return false;
@@ -223,6 +255,7 @@ impl Tokenizer {
             }
 
             let cur = self.nextc();
+            println!("cur: {}", cur);
 
             if cur == '\0' {
                 self.push_token(TokenValue::Eof);
@@ -236,6 +269,8 @@ impl Tokenizer {
                     //  - [1]foo vs [[1] foo] 
                     self.push_token(TokenValue::Swp);
                 }
+            } else if self.match_and_push_operator() {
+                continue;
             } else if cur == '[' {
                 self.push_token(TokenValue::LeftSqBrkt);
             } else if cur == ']' {
@@ -303,7 +338,7 @@ impl Tokenizer {
 
                     let nextc = self.peek1();
 
-                    if is_eof(nextc) || is_wp(nextc) || is_num_separator(nextc) {
+                    if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
                         break;
                     } else if is_digit(nextc) || nextc == '_' {
                         numcur = self.nextc();
@@ -342,7 +377,7 @@ impl Tokenizer {
                         }),
                         Err(e) => self.state = TokenizerState::Error(e.to_string())
                     }
-                    if !is_num_spacer(self.peek1()) {
+                    if !(is_num_spacer(self.peek1()) || is_operator(self.peek1())) {
                         self.state = TokenizerState::Error("Expected spacing after number".to_owned());
                     }
                 }
@@ -1044,6 +1079,98 @@ mod tests {
                 Token{line:1, col:2, value: TokenValue::String("hello".to_owned())},
                 Token{line:1, col:8, value: TokenValue::RightP},
                 Token{line:1, col:8, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_plus() {
+        let mut program = Tokenizer::new(String::from("+"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Operator("+".to_owned())},
+                Token{line:1, col:1, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_plus2() {
+        let mut program = Tokenizer::new(String::from("a+b"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Name("a".to_owned())},
+                Token{line:1, col:2, value: TokenValue::Operator("+".to_owned())},
+                Token{line:1, col:3, value: TokenValue::Name("b".to_owned())},
+                Token{line:1, col:3, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_plus3() {
+        let mut program = Tokenizer::new(String::from("1+1"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:2, value: TokenValue::Operator("+".to_owned())},
+                Token{line:1, col:3, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:3, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_equals() {
+        let mut program = Tokenizer::new(String::from("=="));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Operator("==".to_owned())},
+                Token{line:1, col:2, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_equals2() {
+        let mut program = Tokenizer::new(String::from("a==b"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Name("a".to_owned())},
+                Token{line:1, col:2, value: TokenValue::Operator("==".to_owned())},
+                Token{line:1, col:4, value: TokenValue::Name("b".to_owned())},
+                Token{line:1, col:4, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operator_equals3() {
+        let mut program = Tokenizer::new(String::from("1==1"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:2, value: TokenValue::Operator("==".to_owned())},
+                Token{line:1, col:4, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:4, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
