@@ -1300,7 +1300,7 @@ mod tests {
 
     #[test]
     fn test_parse_mixed_array() {
-        let mut parser = Parser::new(CONFIG, String::from("[true false void null 10 3.14 'hello' -world]"));
+        let mut parser = Parser::new(CONFIG, String::from("[true false void null 10 3.14 'hello' ~world]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Boolean(1, true),
@@ -1363,7 +1363,7 @@ mod tests {
 
     #[test]
     fn test_parse_keyval_dash_string() {
-        let mut parser = Parser::new(CONFIG, String::from("[-key:99]"));
+        let mut parser = Parser::new(CONFIG, String::from("[~key:99]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 99.0),
@@ -1576,7 +1576,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_not_a_varname() {
-        for kw in ["3.14", "()", "[]", "|a|", "'str'", "-str"] {
+        for kw in ["3.14", "()", "[]", "|a|", "'str'", "~str"] {
             let mut parser = Parser::new(CONFIG, String::from(format!("let {} 3 _", kw)));
             parser.parse();
             assert_eq!(parser.ast, vec![]);
@@ -1691,7 +1691,7 @@ mod tests {
     fn test_parse_func_wrong_arg() {
         for kw in [
             "3.14", "()", "[]", "null", "void", "true",
-            "false", "let", "do", "if", "ife", "'str'", "-str"
+            "false", "let", "do", "if", "ife", "'str'", "~str"
         ] {
             let mut parser = Parser::new(CONFIG, String::from(format!("|{}| 3", kw)));
             parser.parse();

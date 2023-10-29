@@ -63,7 +63,7 @@ fn is_operator(c:char) -> bool {
     return c == '+' || c == '*' || c == '/' || c == '=' 
 }
 
-fn is_dashstr_separator(c:char) -> bool {
+fn is_tildestr_separator(c:char) -> bool {
     return c == ':' || c == '[' || c == ']' || c == ',' || c == '(' || c == ')';
 }
 
@@ -377,13 +377,13 @@ impl Tokenizer {
                         self.state = TokenizerState::Error("Expected spacing after number".to_owned());
                     }
                 }
-            } else if cur == '-' {
+            } else if cur == '~' {
                 let mut str: Vec<char> = vec![];
                 let line = self.line;
                 let col = self.col;
                 loop {
                     let nextc = self.peek1();
-                    if is_eof(nextc) || is_wp(nextc) || is_dashstr_separator(nextc) {
+                    if is_eof(nextc) || is_wp(nextc) || is_tildestr_separator(nextc) {
                         break;
                     }
                     str.push(self.nextc());
@@ -577,7 +577,7 @@ mod tests {
     
     #[test]
     fn test_parse_string_foo_bar() {
-        let mut program = Tokenizer::new(String::from("-foo -bar-foo"));
+        let mut program = Tokenizer::new(String::from("~foo ~bar-foo"));
         program.tokenize();
         assert_eq!(
             program.tokens,
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn test_parse_string_doctype() {
-        let mut program = Tokenizer::new(String::from("-!DOCTYPE"));
+        let mut program = Tokenizer::new(String::from("~!DOCTYPE"));
         program.tokenize();
         assert_eq!(
             program.tokens,
@@ -1064,8 +1064,8 @@ mod tests {
         assert_eq!(program.state, TokenizerState::Done);
     }
     #[test]
-    fn test_parse_basic_paren_dash_str() {
-        let mut program = Tokenizer::new(String::from("(-hello)"));
+    fn test_parse_basic_paren_tilde_str() {
+        let mut program = Tokenizer::new(String::from("(~hello)"));
         program.tokenize();
         assert_eq!(
             program.tokens,
