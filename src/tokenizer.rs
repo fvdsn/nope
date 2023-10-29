@@ -289,6 +289,7 @@ impl Tokenizer {
             } else if cur == ',' {
                 self.push_token(TokenValue::Comma);
             } else if cur == '#' {
+                // here we parse comments
                 let line = self.line;
                 let col = self.col;
                 let mut comment: Vec<char> = vec![];
@@ -308,14 +309,14 @@ impl Tokenizer {
                 });
 
             } else if 
-                // here we match for specific keywords
+                // here we match for specific constants 
                 self.match_and_push_number_token("NaN", TokenValue::Number(f64::NAN, None)) ||
                 self.match_and_push_number_token("Inf", TokenValue::Number(f64::INFINITY, None)) ||
                 self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None))
             {
-
+                // we don't allow variables starting with those keywords
                 if !(is_num_spacer(self.peek1()) || is_operator(self.peek1())) {
-                    self.state = TokenizerState::Error("Expected spacing after number".to_owned());
+                    self.state = TokenizerState::Error("Expected spacing after constant".to_owned());
                 }
                 continue;
             } else if is_digit(cur) {
@@ -373,11 +374,9 @@ impl Tokenizer {
                         }),
                         Err(e) => self.state = TokenizerState::Error(e.to_string())
                     }
-                    if !(is_num_spacer(self.peek1()) || is_operator(self.peek1())) {
-                        self.state = TokenizerState::Error("Expected spacing after number".to_owned());
-                    }
                 }
             } else if cur == '~' {
+                // here we parse tilde strings '~foobar'
                 let mut str: Vec<char> = vec![];
                 let line = self.line;
                 let col = self.col;
@@ -394,6 +393,7 @@ impl Tokenizer {
                     value: TokenValue::String(str.iter().collect()),
                 });
             } else if cur == '"' || cur == '\'' {
+                // here we parse regular strings 'foobar' "foobar"
                 let mut escape = false;
                 let line = self.line;
                 let col = self.col;
@@ -434,6 +434,7 @@ impl Tokenizer {
                     });
                 }
             } else if is_namechar(cur) {
+                // here we parse variables and keywords
                 let mut name: Vec<char> = vec![];
                 let line = self.line;
                 let col = self.col;
