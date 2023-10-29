@@ -309,12 +309,9 @@ impl Tokenizer {
 
             } else if 
                 // here we match for specific keywords
-                self.match_and_push_number_token("-NaN", TokenValue::Number(f64::NAN, None)) ||
                 self.match_and_push_number_token("NaN", TokenValue::Number(f64::NAN, None)) ||
-                self.match_and_push_number_token("-Inf", TokenValue::Number(f64::NEG_INFINITY, None)) ||
                 self.match_and_push_number_token("Inf", TokenValue::Number(f64::INFINITY, None)) ||
-                self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None)) ||
-                self.match_and_push_number_token("-Pi", TokenValue::Number(-std::f64::consts::PI, None))
+                self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None))
             {
 
                 if !is_num_spacer(self.peek1()) {
@@ -712,14 +709,13 @@ mod tests {
 
     #[test]
     fn test_parse_num_inf() {
-        let mut program = Tokenizer::new(String::from("Inf -Inf"));
+        let mut program = Tokenizer::new(String::from("Inf"));
         program.tokenize();
         assert_eq!(
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::Number(f64::INFINITY, None)},
-                Token{line:1, col:5, value: TokenValue::Number(f64::NEG_INFINITY, None)},
-                Token{line:1, col:8, value: TokenValue::Eof},
+                Token{line:1, col:3, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
