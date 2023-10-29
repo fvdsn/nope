@@ -318,7 +318,7 @@ impl Tokenizer {
                     self.state = TokenizerState::Error("Expected spacing after number".to_owned());
                 }
                 continue;
-            } else if is_digit(cur) || (cur == '-' && is_digit(self.peek1())) {
+            } else if is_digit(cur) {
                 // here we parse numbers
                 let mut num: Vec<char> = vec![];
                 let mut unit: Vec<char> = vec![];
@@ -749,33 +749,33 @@ mod tests {
         assert_eq!(program.state, TokenizerState::Done);
     }
 
-    #[test]
-    fn test_parse_num_neg42() {
-        let mut program = Tokenizer::new(String::from("-42"));
-        program.tokenize();
-        assert_eq!(
-            program.tokens,
-            vec![
-                Token{line:1, col:1, value: TokenValue::Number(-42.0, None)},
-                Token{line:1, col:3, value: TokenValue::Eof},
-            ],
-        );
-        assert_eq!(program.state, TokenizerState::Done);
-    }
+    //#[test]
+    //fn test_parse_num_neg42() {
+    //    let mut program = Tokenizer::new(String::from("-42"));
+    //    program.tokenize();
+    //    assert_eq!(
+    //        program.tokens,
+    //        vec![
+    //            Token{line:1, col:1, value: TokenValue::Number(-42.0, None)},
+    //            Token{line:1, col:3, value: TokenValue::Eof},
+    //        ],
+    //    );
+    //    assert_eq!(program.state, TokenizerState::Done);
+    //}
 
-    #[test]
-    fn test_parse_num_neg_pi_digits() {
-        let mut program = Tokenizer::new(String::from("-3.141592"));
-        program.tokenize();
-        assert_eq!(
-            program.tokens,
-            vec![
-                Token{line:1, col:1, value: TokenValue::Number(-3.141592, None)},
-                Token{line:1, col:9, value: TokenValue::Eof},
-            ],
-        );
-        assert_eq!(program.state, TokenizerState::Done);
-    }
+    //#[test]
+    //fn test_parse_num_neg_pi_digits() {
+    //    let mut program = Tokenizer::new(String::from("-3.141592"));
+    //    program.tokenize();
+    //    assert_eq!(
+    //        program.tokens,
+    //        vec![
+    //            Token{line:1, col:1, value: TokenValue::Number(-3.141592, None)},
+    //            Token{line:1, col:9, value: TokenValue::Eof},
+    //        ],
+    //    );
+    //    assert_eq!(program.state, TokenizerState::Done);
+    //}
 
     #[test]
     fn test_parse_num_big() {
@@ -872,22 +872,22 @@ mod tests {
     }
 
 
-    #[test]
-    fn test_parse_num_mix() {
-        let mut program = Tokenizer::new(String::from("1 42 -1 99.234"));
-        program.tokenize();
-        assert_eq!(
-            program.tokens,
-            vec![
-                Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
-                Token{line:1, col:3, value: TokenValue::Number(42.0, None)},
-                Token{line:1, col:6, value: TokenValue::Number(-1.0, None)},
-                Token{line:1, col:9, value: TokenValue::Number(99.234, None)},
-                Token{line:1, col:14, value: TokenValue::Eof},
-            ],
-        );
-        assert_eq!(program.state, TokenizerState::Done);
-    }
+    // #[test]
+    // fn test_parse_num_mix() {
+    //     let mut program = Tokenizer::new(String::from("1 42 -1 99.234"));
+    //     program.tokenize();
+    //     assert_eq!(
+    //         program.tokens,
+    //         vec![
+    //             Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
+    //             Token{line:1, col:3, value: TokenValue::Number(42.0, None)},
+    //             Token{line:1, col:6, value: TokenValue::Number(-1.0, None)},
+    //             Token{line:1, col:9, value: TokenValue::Number(99.234, None)},
+    //             Token{line:1, col:14, value: TokenValue::Eof},
+    //         ],
+    //     );
+    //     assert_eq!(program.state, TokenizerState::Done);
+    // }
 
     #[test]
     fn test_parse_comment() {
