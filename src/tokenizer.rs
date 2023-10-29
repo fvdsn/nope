@@ -60,7 +60,7 @@ fn is_separator(c:char) -> bool {
 }
 
 fn is_operator(c:char) -> bool {
-    return c == '+' || c == '*' || c == '/' || c == '=' 
+    return c == '+' || c == '*' || c == '/' || c == '=' || c == '-';
 }
 
 fn is_tildestr_separator(c:char) -> bool {
@@ -69,7 +69,7 @@ fn is_tildestr_separator(c:char) -> bool {
 
 fn is_num_separator(c:char) -> bool {
     return c == ':' || c == '[' || c == ']' || c == '!' || c == '|' 
-        || c == '"' || c == '\'' || c == '-' || c == '#' || c == ','
+        || c == '"' || c == '\'' || c == '#' || c == ','
         || c == ')' || c == '(';
 }
 
@@ -95,8 +95,8 @@ fn is_unit(c:char) -> bool {
     return !is_operator(c) && (c.is_alphabetic() || c.is_ascii_digit() || c == '.');
 }
 
-const OPERATORS: [&str; 4] = [
-    "+", "*", "/", "==",
+const OPERATORS: [&str; 5] = [
+    "+", "-", "*", "/", "==",
 ];
 
 impl Tokenizer {
@@ -314,7 +314,7 @@ impl Tokenizer {
                 self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None))
             {
 
-                if !is_num_spacer(self.peek1()) {
+                if !(is_num_spacer(self.peek1()) || is_operator(self.peek1())) {
                     self.state = TokenizerState::Error("Expected spacing after number".to_owned());
                 }
                 continue;
@@ -749,33 +749,35 @@ mod tests {
         assert_eq!(program.state, TokenizerState::Done);
     }
 
-    //#[test]
-    //fn test_parse_num_neg42() {
-    //    let mut program = Tokenizer::new(String::from("-42"));
-    //    program.tokenize();
-    //    assert_eq!(
-    //        program.tokens,
-    //        vec![
-    //            Token{line:1, col:1, value: TokenValue::Number(-42.0, None)},
-    //            Token{line:1, col:3, value: TokenValue::Eof},
-    //        ],
-    //    );
-    //    assert_eq!(program.state, TokenizerState::Done);
-    //}
+    #[test]
+    fn test_parse_num_neg99() {
+        let mut program = Tokenizer::new(String::from("-99"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Operator("-".to_owned())},
+                Token{line:1, col:2, value: TokenValue::Number(99.0, None)},
+                Token{line:1, col:3, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
 
-    //#[test]
-    //fn test_parse_num_neg_pi_digits() {
-    //    let mut program = Tokenizer::new(String::from("-3.141592"));
-    //    program.tokenize();
-    //    assert_eq!(
-    //        program.tokens,
-    //        vec![
-    //            Token{line:1, col:1, value: TokenValue::Number(-3.141592, None)},
-    //            Token{line:1, col:9, value: TokenValue::Eof},
-    //        ],
-    //    );
-    //    assert_eq!(program.state, TokenizerState::Done);
-    //}
+    #[test]
+    fn test_parse_num_neg_pi_digits() {
+        let mut program = Tokenizer::new(String::from("-3.141592"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Operator("-".to_owned())},
+                Token{line:1, col:2, value: TokenValue::Number(3.141592, None)},
+                Token{line:1, col:9, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
 
     #[test]
     fn test_parse_num_big() {
@@ -865,29 +867,39 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_num_not_spaced() {
+    fn test_parse_num_with_operator() {
         let mut program = Tokenizer::new(String::from("3-3"));
         program.tokenize();
-        assert_eq!(program.state, TokenizerState::Error("Expected spacing after number".to_owned()));
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(3.0, None)},
+                Token{line:1, col:2, value: TokenValue::Operator("-".to_owned())},
+                Token{line:1, col:3, value: TokenValue::Number(3.0, None)},
+                Token{line:1, col:3, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
     }
 
 
-    // #[test]
-    // fn test_parse_num_mix() {
-    //     let mut program = Tokenizer::new(String::from("1 42 -1 99.234"));
-    //     program.tokenize();
-    //     assert_eq!(
-    //         program.tokens,
-    //         vec![
-    //             Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
-    //             Token{line:1, col:3, value: TokenValue::Number(42.0, None)},
-    //             Token{line:1, col:6, value: TokenValue::Number(-1.0, None)},
-    //             Token{line:1, col:9, value: TokenValue::Number(99.234, None)},
-    //             Token{line:1, col:14, value: TokenValue::Eof},
-    //         ],
-    //     );
-    //     assert_eq!(program.state, TokenizerState::Done);
-    // }
+    #[test]
+    fn test_parse_num_mix() {
+        let mut program = Tokenizer::new(String::from("1 42 -1 99.234"));
+        program.tokenize();
+        assert_eq!(
+            program.tokens,
+            vec![
+                Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:3, value: TokenValue::Number(42.0, None)},
+                Token{line:1, col:6, value: TokenValue::Operator("-".to_owned())},
+                Token{line:1, col:7, value: TokenValue::Number(1.0, None)},
+                Token{line:1, col:9, value: TokenValue::Number(99.234, None)},
+                Token{line:1, col:14, value: TokenValue::Eof},
+            ],
+        );
+        assert_eq!(program.state, TokenizerState::Done);
+    }
 
     #[test]
     fn test_parse_comment() {
