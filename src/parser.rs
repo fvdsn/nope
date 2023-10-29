@@ -21,7 +21,6 @@ pub enum AstNode {
     Boolean(usize, bool),
     Null(usize),
     Void(usize),
-    Error(usize, usize), // second usize is index of value expression
     KeyValue(usize, String, usize), // String is  the key, last usize index of the value expression
     Array(usize, Vec<usize>), // vec of indexes to other ast nodes in the ast array
     Let(usize, String, usize, usize), // String is name of var,
@@ -139,10 +138,6 @@ impl Parser {
             },
             AstNode::ValueReference(_, str) => {
                 println!("{}{}", " ".repeat(original_indent), str);
-            },
-            AstNode::Error(_, expr_index) => {
-                println!("{}!", " ".repeat(original_indent));
-                self._pretty_print_ast(*expr_index, indent + 2, false);
             },
             AstNode::Array(_, values) => {
                 println!("{}[", " ".repeat(original_indent));
@@ -1038,14 +1033,6 @@ impl Parser {
                     self.parse_func_call(func_name);
                 }
             },
-            Token {value: TokenValue::Bang, ..} => {
-                let bang_index = self.index;
-                self.parse_expression(false, false, None);
-                if self.parsing_failed() {
-                    return;
-                }
-                self.ast.push(AstNode::Error(bang_index, self.cur_ast_node_index()));
-            },
             Token {value: TokenValue::LeftP, ..} => {
                 let (pline, pcol) = self.cur_line_col();
                 if self.peek_rightp() {
@@ -1427,7 +1414,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_key_in_keyval() {
-        let mut parser = Parser::new(CONFIG, String::from("[!:88]"));
+        let mut parser = Parser::new(CONFIG, String::from("[+:88]"));
         parser.parse();
         assert_eq!(parser.ast, vec![]);
         assert_eq!(parser.state, ParserState::Error);
@@ -1443,17 +1430,6 @@ mod tests {
             AstNode::Array(7, vec![1]),
             AstNode::KeyValue(1, "foo".to_owned(), 2),
             AstNode::Array(8, vec![3]),
-        ]);
-        assert_eq!(parser.state, ParserState::Done);
-    }
-
-    #[test]
-    fn test_parse_error() {
-        let mut parser = Parser::new(CONFIG, String::from("!3.1415"));
-        parser.parse();
-        assert_eq!(parser.ast, vec![
-            AstNode::Number(1, 3.1415),
-            AstNode::Error(0, 0)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }

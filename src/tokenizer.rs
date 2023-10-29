@@ -7,7 +7,6 @@ pub enum TokenValue {
     Colon,
     Dot,
     Pipe,
-    Bang,
     Comma,
     Eof,
     Swp, // Significant whitespace, after `]`
@@ -59,10 +58,6 @@ fn is_separator(c:char) -> bool {
         || c == '(' || c == ')';
 }
 
-fn is_operator(c:char) -> bool {
-    return c == '+' || c == '*' || c == '/' || c == '=' || c == '-';
-}
-
 fn is_tildestr_separator(c:char) -> bool {
     return c == ':' || c == '[' || c == ']' || c == ',' || c == '(' || c == ')';
 }
@@ -95,8 +90,12 @@ fn is_unit(c:char) -> bool {
     return c.is_alphabetic() || c.is_ascii_digit();
 }
 
-const OPERATORS: [&str; 5] = [
-    "+", "-", "*", "/", "==",
+fn is_operator(c:char) -> bool {
+    return c == '+' || c == '*' || c == '/' || c == '=' || c == '-' || c == '!';
+}
+
+const OPERATORS: [&str; 6] = [
+    "+", "-", "*", "/", "!", "==",
 ];
 
 impl Tokenizer {
@@ -284,8 +283,6 @@ impl Tokenizer {
                 self.push_token(TokenValue::Dot);
             } else if cur == '|' {
                 self.push_token(TokenValue::Pipe);
-            } else if cur == '!' {
-                self.push_token(TokenValue::Bang);
             } else if cur == ',' {
                 self.push_token(TokenValue::Comma);
             } else if cur == '#' {
@@ -453,6 +450,8 @@ impl Tokenizer {
                     col,
                     value: TokenValue::Name(name.iter().collect()),
                 });
+            } else {
+                self.state = TokenizerState::Error("Unexpected character".to_owned());
             }
         }
     }
