@@ -91,8 +91,8 @@ fn is_alpha(c:char) -> bool {
 }
 
 fn is_unit(c:char) -> bool {
-    // kg, cm, m3, cu.in
-    return !is_operator(c) && (c.is_alphabetic() || c.is_ascii_digit() || c == '.');
+    // kg, cm, m3
+    return c.is_alphabetic() || c.is_ascii_digit();
 }
 
 const OPERATORS: [&str; 5] = [
@@ -838,14 +838,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_num_123cu_in() {
-        let mut program = Tokenizer::new(String::from("123cu.in"));
+    fn test_parse_num_123cuin() {
+        let mut program = Tokenizer::new(String::from("123cuin"));
         program.tokenize();
         assert_eq!(
             program.tokens,
             vec![
-                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("cu.in".to_owned()))},
-                Token{line:1, col:8, value: TokenValue::Eof},
+                Token{line:1, col:1, value: TokenValue::Number(123.0, Some("cuin".to_owned()))},
+                Token{line:1, col:7, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
