@@ -105,14 +105,14 @@ impl Stdlib {
 
         def_two_args("add",  vec![Instruction::Add]);
         def_two_args("sub",  vec![Instruction::Substract]);
-        def_two_args("<",    vec![Instruction::Less]);
-        def_two_args("<=",   vec![Instruction::LessOrEqual]);
-        def_two_args(">",    vec![Instruction::Greater]);
-        def_two_args(">=",   vec![Instruction::GreaterOrEqual]);
-        def_two_args("==",   vec![Instruction::Equal]);
-        def_two_args("~=",   vec![Instruction::AlmostEqual]);
-        def_two_args("!=",   vec![Instruction::Equal, Instruction::Not]);
-        def_two_args("!~=",  vec![Instruction::AlmostEqual, Instruction::Not]);
+        def_two_args("le",    vec![Instruction::Less]);
+        def_two_args("leq",   vec![Instruction::LessOrEqual]);
+        def_two_args("ge",    vec![Instruction::Greater]);
+        def_two_args("geq",   vec![Instruction::GreaterOrEqual]);
+        def_two_args("eq",   vec![Instruction::Equal]);
+        def_two_args("aeq",   vec![Instruction::AlmostEqual]);
+        def_two_args("neq",   vec![Instruction::Equal, Instruction::Not]);
+        def_two_args("naeq",  vec![Instruction::AlmostEqual, Instruction::Not]);
         def_two_args("max",  vec![Instruction::Max]);
         def_two_args("min",  vec![Instruction::Min]);
         def_two_args("mult", vec![Instruction::Multiply]);

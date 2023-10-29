@@ -91,11 +91,14 @@ fn is_unit(c:char) -> bool {
 }
 
 fn is_operator(c:char) -> bool {
-    return c == '+' || c == '*' || c == '/' || c == '=' || c == '-' || c == '!';
+    return c == '+' || c == '*' || c == '/' || c == '=' 
+        || c == '-' || c == '!' || c == '<' || c == '>'
+        || c == '±';
 }
 
-const OPERATORS: [&str; 6] = [
-    "+", "-", "*", "/", "!", "==",
+const OPERATORS: [&str; 13] = [
+    "+", "-", "*", "/", "!", "<", ">",
+    "==", "!=", "<=", ">=", "±=", "!±=",
 ];
 
 impl Tokenizer {
