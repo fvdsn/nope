@@ -255,7 +255,6 @@ impl Tokenizer {
             }
 
             let cur = self.nextc();
-            println!("cur: {}", cur);
 
             if cur == '\0' {
                 self.push_token(TokenValue::Eof);

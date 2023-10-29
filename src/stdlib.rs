@@ -40,7 +40,7 @@ impl Stdlib {
             Instruction::Multiply,
             Instruction::Floor,
         ]);
-        def_zero_arg("flip-coin", vec![
+        def_zero_arg("flip_coin", vec![
             Instruction::Random,
             Instruction::ConstantNum(0.5),
             Instruction::GreaterOrEqual,
@@ -88,7 +88,7 @@ impl Stdlib {
         def_one_arg("lower",  Instruction::Lower);
         def_one_arg("trim",   Instruction::Trim);
         def_one_arg("shh",    Instruction::Silence);
-        def_one_arg("read-text", Instruction::ReadTextFileSync);
+        def_one_arg("read_text", Instruction::ReadTextFileSync);
 
         let two_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
@@ -117,8 +117,8 @@ impl Stdlib {
         def_two_args("min",  vec![Instruction::Min]);
         def_two_args("mult", vec![Instruction::Multiply]);
         def_two_args("div",  vec![Instruction::Divide]);
-        def_two_args("join-paths", vec![Instruction::JoinPaths]);
-        def_two_args("write-text", vec![Instruction::WriteTextFileSync]);
+        def_two_args("join_paths", vec![Instruction::JoinPaths]);
+        def_two_args("write_text", vec![Instruction::WriteTextFileSync]);
 
         let three_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
