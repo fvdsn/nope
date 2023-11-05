@@ -92,13 +92,12 @@ fn is_unit(c:char) -> bool {
 
 fn is_operator(c:char) -> bool {
     return c == '+' || c == '*' || c == '/' || c == '=' 
-        || c == '-' || c == '!' || c == '<' || c == '>'
-        || c == '±';
+        || c == '-' || c == '!' || c == '<' || c == '>';
 }
 
 const OPERATORS: [&str; 13] = [
-    "+", "-", "*", "/", "!", "<", ">",
-    "==", "!=", "<=", ">=", "±=", "!±=",
+     "==", "!=", "<=", ">=", "+-=", "!+-=",
+     "<", ">", "+", "-", "*", "/", "!", 
 ];
 
 impl Tokenizer {
@@ -177,6 +176,9 @@ impl Tokenizer {
         } else {
             for operator in OPERATORS {
                 let mut matches = true;
+                if self.index + operator.len() > self.chars.len() {
+                    continue;
+                }
                 for (i, c) in operator.chars().enumerate() {
                     if c != self.chars[self.index + i] {
                         matches = false;
@@ -1184,5 +1186,23 @@ mod tests {
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
+    }
+
+    #[test]
+    fn test_parse_operators() {
+        for operator in OPERATORS {
+            let mut program = Tokenizer::new(format!("1{}1", operator));
+            program.tokenize();
+            assert_eq!(
+                program.tokens,
+                vec![
+                    Token{line:1, col:1, value: TokenValue::Number(1.0, None)},
+                    Token{line:1, col:2, value: TokenValue::Operator(operator.to_owned())},
+                    Token{line:1, col:2 + operator.len(), value: TokenValue::Number(1.0, None)},
+                    Token{line:1, col:2 + operator.len(), value: TokenValue::Eof},
+                ],
+            );
+            assert_eq!(program.state, TokenizerState::Done);
+        }
     }
 }
