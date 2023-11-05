@@ -13,6 +13,13 @@ use crate::penv::{
 
 use colored::*;
 
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum UnaryOp {
+    Not,
+    Negate,
+    Add,
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
     // first usize is index of related token in tokens array
@@ -38,6 +45,7 @@ pub enum AstNode {
                                             // which we access the key from
     DynamicKeyAccess(usize, usize, usize), // second usize is the expression that gives the key,
                                             // last usize is the expression that gives the array,
+    UnaryOperator(usize, UnaryOp, usize), 
     CodeBlock(usize, Vec<usize>),
 }
 
@@ -211,6 +219,10 @@ impl Parser {
             AstNode::DynamicKeyAccess(_, key_expr, expr) => {
                 print!("{}[]: ", " ".repeat(original_indent));
                 self._pretty_print_ast(*key_expr, indent + 2, true);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            },
+            AstNode::UnaryOperator(_, op, expr) => {
+                print!("{}{:?}:", " ".repeat(original_indent), op);
                 self._pretty_print_ast(*expr, indent + 2, false);
             },
         }
@@ -1005,6 +1017,31 @@ impl Parser {
                         self.push_error(line, col, "ERROR: unknown unit".to_owned());
                     }
                 };
+            },
+            Token {value: TokenValue::Operator(ref operator), ..} => {
+                if operator == "!" || operator == "-"  || operator == "+" {
+
+                    let op = if operator == "!" { 
+                        UnaryOp::Not 
+                    } else if operator == "-" {
+                        UnaryOp::Negate 
+                    } else { 
+                        UnaryOp::Add 
+                    };
+
+                    self.parse_expression(false, false, None);
+                    if self.parsing_failed() {
+                        return;
+                    }
+                    self.ast.push(AstNode::UnaryOperator(
+                        self.index,
+                        op,
+                        self.cur_ast_node_index(),
+                    ));
+                } else {
+                    let (line, col) = self.cur_line_col();
+                    self.push_error(line, col, "ERROR: unexpected operator".to_owned());
+                }
             },
             Token {value: TokenValue::Name(ref name, ..), ..} => {
                 if dot_after_token {

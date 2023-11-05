@@ -5,6 +5,7 @@ use crate::{
     parser::{
         Parser,
         AstNode,
+        UnaryOp,
     },
     penv::{
         Env,
@@ -246,6 +247,23 @@ impl Vm {
                         return false;
                     }
                 };
+            },
+            AstNode::UnaryOperator(_, op, expr_node_idx) => {
+                if !self.compile_node(ast, *expr_node_idx) {
+                    println!("error compiling value of unary expression");
+                    return false;
+                }
+                match op {
+                    UnaryOp::Not => {
+                        self.chunk.write(node_idx, Instruction::Not);
+                    },
+                    UnaryOp::Negate => {
+                        self.chunk.write(node_idx, Instruction::Negate);
+                    },
+                    UnaryOp::Add => {
+                        self.chunk.write(node_idx, Instruction::Num);
+                    },
+                }
             },
             _ => {
                 return false;
