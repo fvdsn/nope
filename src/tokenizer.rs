@@ -3,6 +3,7 @@ pub enum TokenValue {
     LeftSqBrkt,
     RightSqBrkt,
     LeftP,
+    NameLeftP,
     RightP,
     Colon,
     Dot,
@@ -444,10 +445,15 @@ impl Tokenizer {
                 let line = self.line;
                 let col = self.col;
                 let mut namecur = cur;
+                let mut nameleftp = false;
                 loop {
                     name.push(namecur);
                     let nextc = self.peek1();
-                    if is_eof(nextc) || !is_namechar(nextc) {
+                    if nextc == '(' {
+                        nameleftp = true;
+                        self.nextc();
+                        break;
+                    } else if is_eof(nextc) || !is_namechar(nextc) {
                         break;
                     } else {
                         namecur = self.nextc();
@@ -458,6 +464,9 @@ impl Tokenizer {
                     col,
                     value: TokenValue::Name(name.iter().collect()),
                 });
+                if nameleftp {
+                    self.push_token(TokenValue::NameLeftP);
+                }
             } else {
                 self.state = TokenizerState::Error("Unexpected character".to_owned());
             }

@@ -377,12 +377,16 @@ impl Parser {
     fn peek_eof(&self) -> bool {
         let token = &self.peekt();
         match token {
-            Token {value: TokenValue::Eof, ..} => {
-                return true;
-            },
-            _ => {
-                return false;
-            }
+            Token {value: TokenValue::Eof, ..} => return true,
+            _ => return false,
+        }
+    }
+
+    fn peek_nleftp(&self) -> bool {
+        let token = &self.peekt();
+        match token {
+            Token {value: TokenValue::NameLeftP, ..} => return true,
+            _ => return false,
         }
     }
 
@@ -950,9 +954,21 @@ impl Parser {
     fn parse_func_call(&mut self, name:String) {
         let (line, col) = self.cur_line_col();
         let mut uses_commas = false;
+        let mut explicit_func_call = false;
+
+        if self.peek_nleftp() { // function call is of the form 'foo(...)' instead of 'foo ...'
+            explicit_func_call = true;
+            self.nextt();
+        }
+
         match self.env.get_entry(&name) {
             Some(env_entry) => {
                 if !env_entry.is_func {
+                    if explicit_func_call {
+                        let (line, col) = self.cur_line_col();
+                        self.push_error(line, col, "ERROR: the referenced variable is not a function".to_owned());
+                        return;
+                    }
                     self.ast.push(AstNode::ValueReference(self.index, name));
                 } else {
                     let mut arg_node_indexes: Vec<usize> = vec![];
@@ -970,7 +986,12 @@ impl Parser {
                         }
 
                         let (aline, acol) = self.peek_line_col();
-                        self.parse_expression(false, false, None);
+
+                        if explicit_func_call {
+                            self.parse_expression(false, false, None);
+                        } else {
+                            self.parse_unary(false, false, None);
+                        }
 
                         if self.parsing_failed() {
                             return;
@@ -1028,6 +1049,22 @@ impl Parser {
                         arg_node_indexes.push(self.cur_ast_node_index()); 
                     }
                     self.ast.push(AstNode::FunctionCall(self.index, name, arg_node_indexes));
+                    
+                    if explicit_func_call {
+                        if self.peek_rightp() {
+                            self.nextt();
+                        } else if self.peek_eof() {
+                            let (vline, vcol) = self.peek_line_col();
+                            self.push_info(line, col, "this function call is missing a closing parenthesis".to_owned());
+                            self.push_incomplete(vline, vcol, "ERROR: expected ')'".to_owned());
+                            return;
+                        } else {
+                            let (vline, vcol) = self.peek_line_col();
+                            self.push_info(line, col, "this function call is missing a closing parenthesis".to_owned());
+                            self.push_error(vline, vcol, "ERROR: expected expected ')'".to_owned());
+                            return;
+                        }
+                    }
                 }
             },
             None => {
