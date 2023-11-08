@@ -34,11 +34,14 @@ pub enum BinaryOperator {
     Subtract,
     Multiply,
     Divide,
+    Modulo,
 }
 
 const MIN_PRECEDENCE: usize = 0;
 
 fn operator_precedence(op: BinaryOperator) -> usize {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence
+
     match op {
         BinaryOperator::Equal => 8,
         BinaryOperator::NotEqual => 8,
@@ -52,6 +55,7 @@ fn operator_precedence(op: BinaryOperator) -> usize {
         BinaryOperator::Subtract => 11,
         BinaryOperator::Multiply => 12,
         BinaryOperator::Divide => 12,
+        BinaryOperator::Modulo => 12,
     }
 }
 
@@ -425,6 +429,7 @@ impl Parser {
                     "-"    => Some(BinaryOperator::Subtract),
                     "*"    => Some(BinaryOperator::Multiply),
                     "/"    => Some(BinaryOperator::Divide),
+                    "%"    => Some(BinaryOperator::Modulo),
                     _ => None, 
                 }
             }

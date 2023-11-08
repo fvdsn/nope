@@ -58,37 +58,51 @@ impl Stdlib {
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
         ];
 
-        let mut def_one_arg = |name: &str, instruction: Instruction| {
+        let mut def_one_arg = |name: &str, instructions: Vec<Instruction>| {
             stdlib.functions.push(StdlibFunction {
-                instructions: vec![instruction],
+                instructions,
                 name: name.to_owned(),
                 args: one_arg_func.clone(),
             });
         };
 
-        def_one_arg("num",    Instruction::Num);
-        def_one_arg("print",  Instruction::Print);
-        def_one_arg("echo",   Instruction::Echo);
-        def_one_arg("neg",    Instruction::Negate);
-        def_one_arg("return", Instruction::Return,);
-        def_one_arg("not",    Instruction::Not);
-        def_one_arg("bool",   Instruction::Bool);
-        def_one_arg("floor",  Instruction::Floor);
-        def_one_arg("ceil",   Instruction::Ceil);
-        def_one_arg("abs",    Instruction::Abs);
-        def_one_arg("acos",   Instruction::Acos);
-        def_one_arg("decr",   Instruction::Decr);
-        def_one_arg("incr",   Instruction::Incr);
-        def_one_arg("sin",    Instruction::Sin);
-        def_one_arg("cos",    Instruction::Cos);
-        def_one_arg("tan",    Instruction::Tan);
-        def_one_arg("inv",    Instruction::Inv);
-        def_one_arg("str",    Instruction::Str);
-        def_one_arg("upper",  Instruction::Upper);
-        def_one_arg("lower",  Instruction::Lower);
-        def_one_arg("trim",   Instruction::Trim);
-        def_one_arg("shh",    Instruction::Silence);
-        def_one_arg("read_text", Instruction::ReadTextFileSync);
+        def_one_arg("num",    vec![Instruction::Num]);
+        def_one_arg("print",  vec![Instruction::Print]);
+        def_one_arg("echo",   vec![Instruction::Echo]);
+        def_one_arg("neg",    vec![Instruction::Negate]);
+        def_one_arg("return", vec![Instruction::Return,]);
+        def_one_arg("not",    vec![Instruction::Not]);
+        def_one_arg("bool",   vec![Instruction::Bool]);
+        def_one_arg("floor",  vec![Instruction::Floor]);
+        def_one_arg("ceil",   vec![Instruction::Ceil]);
+        def_one_arg("abs",    vec![Instruction::Abs]);
+        def_one_arg("acos",   vec![Instruction::Acos]);
+        def_one_arg("decr",   vec![Instruction::Decr]);
+        def_one_arg("incr",   vec![Instruction::Incr]);
+        def_one_arg("sin",    vec![Instruction::Sin]);
+        def_one_arg("cos",    vec![Instruction::Cos]);
+        def_one_arg("tan",    vec![Instruction::Tan]);
+        def_one_arg("inv",    vec![Instruction::Inv]);
+        def_one_arg("str",    vec![Instruction::Str]);
+        def_one_arg("upper",  vec![Instruction::Upper]);
+        def_one_arg("lower",  vec![Instruction::Lower]);
+        def_one_arg("trim",   vec![Instruction::Trim]);
+        def_one_arg("shh",    vec![Instruction::Silence]);
+        def_one_arg("read_text", vec![Instruction::ReadTextFileSync]);
+        def_one_arg("is_even", vec![
+            Instruction::ConstantNum(2.0),
+            Instruction::Modulo,
+            Instruction::ConstantNum(0.0),
+            Instruction::Equal,
+        ]);
+        def_one_arg("is_odd", vec![
+            Instruction::ConstantNum(2.0),
+            Instruction::Modulo,
+            Instruction::ConstantNum(0.0),
+            Instruction::Equal,
+            Instruction::Not,
+        ]);
+
 
         let two_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
@@ -117,6 +131,7 @@ impl Stdlib {
         def_two_args("min",  vec![Instruction::Min]);
         def_two_args("mult", vec![Instruction::Multiply]);
         def_two_args("div",  vec![Instruction::Divide]);
+        def_two_args("modulo",     vec![Instruction::Modulo]);
         def_two_args("join_paths", vec![Instruction::JoinPaths]);
         def_two_args("write_text", vec![Instruction::WriteTextFileSync]);
 

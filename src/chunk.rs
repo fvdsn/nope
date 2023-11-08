@@ -51,6 +51,7 @@ pub enum Instruction {
     Subtract,
     Multiply,
     Divide,
+    Modulo,
     Random,
     Print,
     Echo,
