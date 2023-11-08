@@ -450,6 +450,11 @@ impl Parser {
         return matches!(token.value, TokenValue::Comma);
     }
 
+    fn peek_equal(&self) -> bool {
+        let token = &self.peekt();
+        return matches!(token.value, TokenValue::Equal);
+    }
+
     fn peek_colon(&self) -> bool {
         let token = &self.peekt();
         return matches!(token.value, TokenValue::Colon);
@@ -877,7 +882,7 @@ impl Parser {
         }
         
         let let_idx = self.index;
-        
+
         let token = &self.nextt().clone();
         match token {
             Token {value: TokenValue::Name(ref var_name, ..), ..} => {
@@ -890,6 +895,11 @@ impl Parser {
                         self.push_error(vline, vcol, "ERROR: expected value for the defined variable".to_owned());
                         return;
                     }
+
+                    if self.peek_equal() { // we accept an optional '='; "let x = 42" or "let x 42"
+                        self.nextt();
+                    }
+        
                     self.parse_expression(false, false, Some(var_name));
                     if self.parsing_failed() {
                         return;
@@ -1680,6 +1690,18 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_let_with_equal() {
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 x"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 3.0),
+            AstNode::ValueReference(4, "x".to_owned()),
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
     fn test_parse_let_wrong_var() {
         let mut parser = Parser::new(CONFIG, String::from("let x 3 y"));
         parser.parse();
@@ -2444,6 +2466,40 @@ mod tests {
               AstNode::Number(0, 1.0),
               AstNode::Number(2, 1.0),
               AstNode::BinaryOperator(1, BinaryOperator::Add, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_binary_add_add() {
+        let mut parser = Parser::new(CONFIG, String::from("1+1+1"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(0, 1.0),
+              AstNode::Number(2, 1.0),
+              AstNode::BinaryOperator(1, BinaryOperator::Add, 0, 1),
+              AstNode::Number(4, 1.0),
+              AstNode::BinaryOperator(3, BinaryOperator::Add, 2, 3),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_binary_op_precedence() {
+        let mut parser = Parser::new(CONFIG, String::from("1+2*3==3*2+1"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 1.0),
+            AstNode::Number(2, 2.0),
+            AstNode::Number(4, 3.0),
+            AstNode::BinaryOperator(3, BinaryOperator::Multiply, 1, 2),
+            AstNode::BinaryOperator(1, BinaryOperator::Add, 0, 3),
+            AstNode::Number(6, 3.0),
+            AstNode::Number(8, 2.0),
+            AstNode::BinaryOperator(7, BinaryOperator::Multiply, 5, 6),
+            AstNode::Number(10, 1.0),
+            AstNode::BinaryOperator(9, BinaryOperator::Add, 7, 8),
+            AstNode::BinaryOperator(5, BinaryOperator::Equal, 4, 9),
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }

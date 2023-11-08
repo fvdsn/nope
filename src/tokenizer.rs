@@ -8,6 +8,7 @@ pub enum TokenValue {
     Dot,
     Pipe,
     Comma,
+    Equal,
     Eof,
     Swp, // Significant whitespace, after `]`
     Number(f64, Option<String>),
@@ -274,6 +275,8 @@ impl Tokenizer {
                 }
             } else if self.match_and_push_operator() {
                 continue;
+            } else if cur == '=' {
+                self.push_token(TokenValue::Equal);
             } else if cur == '[' {
                 self.push_token(TokenValue::LeftSqBrkt);
             } else if cur == ']' {
