@@ -5,7 +5,8 @@ use crate::{
     parser::{
         Parser,
         AstNode,
-        UnaryOp,
+        UnaryOperator,
+        BinaryOperator,
     },
     penv::{
         Env,
@@ -254,15 +255,45 @@ impl Vm {
                     return false;
                 }
                 match op {
-                    UnaryOp::Not => {
+                    UnaryOperator::Not => {
                         self.chunk.write(node_idx, Instruction::Not);
                     },
-                    UnaryOp::Negate => {
+                    UnaryOperator::Negate => {
                         self.chunk.write(node_idx, Instruction::Negate);
                     },
-                    UnaryOp::Add => {
+                    UnaryOperator::Add => {
                         self.chunk.write(node_idx, Instruction::Num);
                     },
+                }
+            },
+            AstNode::BinaryOperator(_, op, lexpr_node_idx, rexpr_node_idx) => {
+                if !self.compile_node(ast, *lexpr_node_idx) {
+                    println!("error compiling left arm of binary operator");
+                    return false;
+                }
+                if !self.compile_node(ast, *rexpr_node_idx) {
+                    println!("error compiling right arm of binary operator");
+                    return false;
+                }
+                match op {
+                    BinaryOperator::Equal          => { self.chunk.write(node_idx, Instruction::Equal); },
+                    BinaryOperator::NotEqual       => { 
+                        self.chunk.write(node_idx, Instruction::Equal);
+                        self.chunk.write(node_idx, Instruction::Not);
+                    },
+                    BinaryOperator::Less           => { self.chunk.write(node_idx, Instruction::Less);},
+                    BinaryOperator::LessOrEqual    => { self.chunk.write(node_idx, Instruction::LessOrEqual);},
+                    BinaryOperator::Greater        => { self.chunk.write(node_idx, Instruction::Greater);},
+                    BinaryOperator::GreaterOrEqual => { self.chunk.write(node_idx, Instruction::GreaterOrEqual);},
+                    BinaryOperator::AlmostEqual    => { self.chunk.write(node_idx, Instruction::AlmostEqual);},
+                    BinaryOperator::NotAlmostEqual => {
+                        self.chunk.write(node_idx, Instruction::AlmostEqual);
+                        self.chunk.write(node_idx, Instruction::Not);
+                    },
+                    BinaryOperator::Add            => { self.chunk.write(node_idx, Instruction::Add);},
+                    BinaryOperator::Subtract       => { self.chunk.write(node_idx, Instruction::Subtract);},
+                    BinaryOperator::Multiply       => { self.chunk.write(node_idx, Instruction::Multiply);},
+                    BinaryOperator::Divide         => { self.chunk.write(node_idx, Instruction::Divide);},
                 }
             },
             _ => {
@@ -676,7 +707,7 @@ impl Vm {
                     let ref_ab = self.intern(str_ab);
                     self.push(Value::String(ref_ab));
                 },
-                Instruction::Substract => {
+                Instruction::Subtract => {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {

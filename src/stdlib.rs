@@ -104,7 +104,7 @@ impl Stdlib {
         };
 
         def_two_args("add",  vec![Instruction::Add]);
-        def_two_args("sub",  vec![Instruction::Substract]);
+        def_two_args("sub",  vec![Instruction::Subtract]);
         def_two_args("le",    vec![Instruction::Less]);
         def_two_args("leq",   vec![Instruction::LessOrEqual]);
         def_two_args("ge",    vec![Instruction::Greater]);

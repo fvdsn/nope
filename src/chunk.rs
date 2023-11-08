@@ -48,7 +48,7 @@ pub enum Instruction {
     Negate,
     Add,
     JoinPaths,
-    Substract,
+    Subtract,
     Multiply,
     Divide,
     Random,

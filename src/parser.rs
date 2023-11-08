@@ -14,10 +14,26 @@ use crate::penv::{
 use colored::*;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
-pub enum UnaryOp {
+pub enum UnaryOperator {
     Not,
     Negate,
     Add,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum BinaryOperator {
+    Equal,
+    NotEqual,
+    Less,
+    LessOrEqual,
+    Greater,
+    GreaterOrEqual,
+    AlmostEqual,
+    NotAlmostEqual,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -39,13 +55,14 @@ pub enum AstNode {
     If(usize, usize, usize), // if $cond $expr1 
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
     ValueReference(usize, String),    // reference to the variable 'String' that contains a value
-    FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
+FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
     FunctionDef(usize, Vec<FunctionArg>, usize), // last usize is ref to function expression 
     StaticKeyAccess(usize, String, usize),  // string is name of key, last usize is expression of
                                             // which we access the key from
     DynamicKeyAccess(usize, usize, usize), // second usize is the expression that gives the key,
                                             // last usize is the expression that gives the array,
-    UnaryOperator(usize, UnaryOp, usize), 
+    UnaryOperator(usize, UnaryOperator, usize), 
+    BinaryOperator(usize, BinaryOperator, usize, usize), 
     CodeBlock(usize, Vec<usize>),
 }
 
@@ -225,6 +242,11 @@ impl Parser {
                 print!("{}{:?}:", " ".repeat(original_indent), op);
                 self._pretty_print_ast(*expr, indent + 2, false);
             },
+            AstNode::BinaryOperator(_, op, lexpr, rexpr) => {
+                print!("{}{:?}:", " ".repeat(original_indent), op);
+                self._pretty_print_ast(*lexpr, indent + 2, false);
+                self._pretty_print_ast(*rexpr, indent + 2, false);
+            },
         }
     }
 
@@ -358,6 +380,32 @@ impl Parser {
             },
             _ => {
                 return false;
+            }
+        }
+    }
+
+    fn peek_binary_op(&self) -> Option<BinaryOperator> {
+        let token = &self.peekt();
+        return match token {
+            Token {value: TokenValue::Operator(op), ..} => {
+                match op.as_str() {
+                    "=="   => Some(BinaryOperator::Equal),
+                    "!="   => Some(BinaryOperator::NotEqual),
+                    "<="   => Some(BinaryOperator::LessOrEqual),
+                    ">="   => Some(BinaryOperator::GreaterOrEqual),
+                    "+-="  => Some(BinaryOperator::AlmostEqual),
+                    "!+-=" => Some(BinaryOperator::NotAlmostEqual),
+                    "<"    => Some(BinaryOperator::Less),
+                    ">"    => Some(BinaryOperator::Greater),
+                    "+"    => Some(BinaryOperator::Add),
+                    "-"    => Some(BinaryOperator::Subtract),
+                    "*"    => Some(BinaryOperator::Multiply),
+                    "/"    => Some(BinaryOperator::Divide),
+                    _ => None, 
+                }
+            }
+            _ => {
+                None
             }
         }
     }
@@ -995,6 +1043,36 @@ impl Parser {
         // expression code block
         // - var_name is the name of the variable this expression will be assigned to;
         // used to handle recursion
+
+        self.parse_unary(global_scope, code_block, var_name);
+
+        if self.parsing_failed() {
+            return;
+        }
+        
+        if let Some(op) = self.peek_binary_op() {
+            let left_arm_index = self.cur_ast_node_index();
+            self.nextt();
+            let op_token_index = self.index;
+            self.parse_expression(false, false, var_name);
+            
+            if self.parsing_failed() {
+                return;
+            }
+
+            let right_arm_index = self.cur_ast_node_index();
+
+            self.ast.push(AstNode::BinaryOperator(op_token_index, op, left_arm_index, right_arm_index));
+        }
+    }
+
+    fn parse_unary(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
+        // - global_scope is true if the expression makes variables declaration part of the global
+        // scope
+        // - code_block is true if the expression makes variables declarations part of a multi
+        // expression code block
+        // - var_name is the name of the variable this expression will be assigned to;
+        // used to handle recursion
         let dot_after_token = self.peek2_dot();
         let token = &self.nextt();
         match token {
@@ -1022,19 +1100,21 @@ impl Parser {
                 if operator == "!" || operator == "-"  || operator == "+" {
 
                     let op = if operator == "!" { 
-                        UnaryOp::Not 
+                        UnaryOperator::Not 
                     } else if operator == "-" {
-                        UnaryOp::Negate 
+                        UnaryOperator::Negate 
                     } else { 
-                        UnaryOp::Add 
+                        UnaryOperator::Add 
                     };
+
+                    let op_token_index = self.index;
 
                     self.parse_expression(false, false, None);
                     if self.parsing_failed() {
                         return;
                     }
                     self.ast.push(AstNode::UnaryOperator(
-                        self.index,
+                        op_token_index,
                         op,
                         self.cur_ast_node_index(),
                     ));
@@ -2248,5 +2328,63 @@ mod tests {
            AstNode::Void(8),
            AstNode::GlobalLet(0, "a".to_owned(), 3, 4)
         ]);
+    }
+
+    #[test]
+    fn test_parse_not() {
+        let mut parser = Parser::new(CONFIG, String::from("!32"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(1, 32.0),
+              AstNode::UnaryOperator(0, UnaryOperator::Not, 0),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_neg() {
+        let mut parser = Parser::new(CONFIG, String::from("-32"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(1, 32.0),
+              AstNode::UnaryOperator(0, UnaryOperator::Negate, 0),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_plus() {
+        let mut parser = Parser::new(CONFIG, String::from("+32"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(1, 32.0),
+              AstNode::UnaryOperator(0, UnaryOperator::Add, 0),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_not_plus_minus() {
+        let mut parser = Parser::new(CONFIG, String::from("!+-32"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(3, 32.0),
+              AstNode::UnaryOperator(2, UnaryOperator::Negate, 0),
+              AstNode::UnaryOperator(1, UnaryOperator::Add, 1),
+              AstNode::UnaryOperator(0, UnaryOperator::Not, 2),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_binary_add() {
+        let mut parser = Parser::new(CONFIG, String::from("1+1"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(0, 1.0),
+              AstNode::Number(2, 1.0),
+              AstNode::BinaryOperator(1, BinaryOperator::Add, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
     }
 }
