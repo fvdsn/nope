@@ -36,6 +36,26 @@ pub enum BinaryOperator {
     Divide,
 }
 
+const MIN_PRECEDENCE: usize = 0;
+
+fn operator_precedence(op: BinaryOperator) -> usize {
+    match op {
+        BinaryOperator::Equal => 8,
+        BinaryOperator::NotEqual => 8,
+        BinaryOperator::Less => 9,
+        BinaryOperator::LessOrEqual => 9,
+        BinaryOperator::Greater => 9,
+        BinaryOperator::GreaterOrEqual => 9,
+        BinaryOperator::AlmostEqual => 9,
+        BinaryOperator::NotAlmostEqual => 9,
+        BinaryOperator::Add => 11,
+        BinaryOperator::Subtract => 11,
+        BinaryOperator::Multiply => 12,
+        BinaryOperator::Divide => 12,
+    }
+}
+
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
     // first usize is index of related token in tokens array
@@ -1050,29 +1070,69 @@ impl Parser {
             return;
         }
         
-        if let Some(op) = self.peek_binary_op() {
-            let left_arm_index = self.cur_ast_node_index();
-            self.nextt();
-            let op_token_index = self.index;
-            self.parse_expression(false, false, var_name);
-            
-            if self.parsing_failed() {
-                return;
+        let left_node_index = self.cur_ast_node_index();
+
+        self.parse_binary(left_node_index, MIN_PRECEDENCE, var_name);
+    }
+
+    fn parse_binary(
+        &mut self,
+        mut left_node_index: usize,
+        min_precedence: usize,
+        var_name: Option<&str>
+    ) {
+        // https://en.wikipedia.org/wiki/Operator-precedence_parser
+
+        loop {
+            if let Some(op) = self.peek_binary_op() {
+                if operator_precedence(op) < min_precedence {
+                    return;
+                }
+
+                self.nextt();
+
+                let op_token_index = self.index;
+
+                self.parse_unary(false, false, var_name);
+
+                let mut right_node_index = self.cur_ast_node_index();
+
+                if self.parsing_failed() {
+                    return;
+                }
+
+                loop {
+                    if let Some(op_ahead) = self.peek_binary_op() {
+                        if operator_precedence(op_ahead) <= operator_precedence(op) {
+                            break;
+                        }
+                        self.parse_binary(
+                            right_node_index,
+                            operator_precedence(op) + 1,
+                            var_name,
+                        );
+                        
+                        if self.parsing_failed() {
+                            return;
+                        }
+
+                        right_node_index = self.cur_ast_node_index();
+                    } else {
+                        break;
+                    }
+                }
+
+                self.ast.push(AstNode::BinaryOperator(op_token_index, op, left_node_index, right_node_index));
+
+                left_node_index = self.cur_ast_node_index();
+            } else {
+                break;
             }
-
-            let right_arm_index = self.cur_ast_node_index();
-
-            self.ast.push(AstNode::BinaryOperator(op_token_index, op, left_arm_index, right_arm_index));
         }
     }
 
     fn parse_unary(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
-        // - global_scope is true if the expression makes variables declaration part of the global
-        // scope
-        // - code_block is true if the expression makes variables declarations part of a multi
-        // expression code block
-        // - var_name is the name of the variable this expression will be assigned to;
-        // used to handle recursion
+
         let dot_after_token = self.peek2_dot();
         let token = &self.nextt();
         match token {
