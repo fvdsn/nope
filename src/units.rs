@@ -90,6 +90,15 @@ pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
         "MB" => {num *= 1024.0 * 1024.0},
         "KiB" => {num *= 1024.0},
         "KB" => {num *= 1024.0},
+        "million" => {num *= 1000.0 * 1000.0 },
+        "billion" => {num *= 1000.0 * 1000.0 * 1000.0},
+        "trillion" => {num *= 1000.0 * 1000.0 * 1000.0 * 1000.0},
+        "quadrillon" => {num *= 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0},
+        "milli" => {num *= 0.001 },
+        "thousandth" => {num *= 0.001 },
+        "micro" => {num *= 0.000001},
+        "nano" => {num *= 0.000000001},
+        "pico" => {num *= 0.000000000001},
 
         _ => {
             return None;
