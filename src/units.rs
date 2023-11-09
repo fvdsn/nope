@@ -32,6 +32,7 @@ pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
         "ms" => {num *= 0.001},
         "us" => {num *= 0.000001},
         "ns" => {num *= 0.000000001},
+        "moon" => { num *= 2551442.976 },
         "deg" => {num *= std::f64::consts::PI / 180.0},
         "rad" => {},
         "in" => {num *= 0.024},
@@ -81,6 +82,8 @@ pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
         "sqft" => {num *= 0.092903},
         "in2" => {num *= 0.00064516},
         "sqin" => {num *= 0.00064516},
+        "belgium" => {num *= 30688000000.0},
+        "footballfield" => {num *= 6000.0},
         // bytes
         "TiB" => {num *= 1024.0 * 1024.0 * 1024.0 * 1024.0},
         "TB" => {num *= 1024.0 * 1024.0 * 1024.0 * 1024.0},
