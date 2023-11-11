@@ -3,14 +3,7 @@ use std::f64;
 pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
     match unit {
         "pi" => {num *= f64::consts::PI},
-        "sqrt2" => {num *= f64::consts::SQRT_2},
-        "sqrt2pi" => {num *= 2.506_628_274_631_000_7},
-        // this is kind of confusing with 10e 5 looks like 10 exponent 5
-        //"e" => {num *= 2.718281828459045},
-        "ln2" => {num *= f64::consts::LN_2},
-        "ln10" => {num *= f64::consts::LN_10},
-        "log10e" => {num *= f64::consts::LOG10_E},
-        "log2e" => {num *= f64::consts::LOG2_E},
+        "tau" => {num *= f64::consts::PI*2.0},
         "phi" => {num *= 1.618033988749894},
         "GT" => {num *= 1000000000000.0},
         "MT" => {num *= 1000000000.0},

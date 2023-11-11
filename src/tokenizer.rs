@@ -70,11 +70,6 @@ fn is_num_separator(c:char) -> bool {
         || c == ')' || c == '(';
 }
 
-fn is_num_spacer(c:char) -> bool {
-    return c == ' ' || c == '\t' || c == '\n' || c == ',' || c == ')' || c == ']'
-        || c == '\0' || c == '#' || c == '|' || c == ':';
-}
-
 fn is_namechar(c:char) -> bool {
     return !is_wp(c) && !is_separator(c) && !is_operator(c);
 }
@@ -200,31 +195,6 @@ impl Tokenizer {
         return false;
     }
 
-    fn match_and_push_number_token(&mut self, token: &str, value:TokenValue) -> bool {
-        if token.len() + self.index > self.chars.len() {
-            return false;
-        } else {
-            for (i, c) in token.chars().enumerate() {
-                if c != self.chars[self.index + i] {
-                    return false;
-                }
-            }
-        }
-        if token.len() + self.index < self.chars.len() &&
-           is_namechar(self.chars[self.index + token.len()]) {
-            return false;
-        }
-
-        self.push_token(value);
-
-        for _ in 0..token.len()-1 {
-            self.nextc();
-        }
-
-        return true;
-    }
-
-
     fn push_token(&mut self, value:TokenValue) {
         self.tokens.push(Token {
             line: self.line,
@@ -315,17 +285,6 @@ impl Tokenizer {
                     value: TokenValue::Comment(comment.iter().collect()),
                 });
 
-            } else if 
-                // here we match for specific constants 
-                self.match_and_push_number_token("NaN", TokenValue::Number(f64::NAN, None)) ||
-                self.match_and_push_number_token("Inf", TokenValue::Number(f64::INFINITY, None)) ||
-                self.match_and_push_number_token("Pi", TokenValue::Number(std::f64::consts::PI, None))
-            {
-                // we don't allow variables starting with those keywords
-                if !(is_num_spacer(self.peek1()) || is_operator(self.peek1())) {
-                    self.state = TokenizerState::Error("Expected spacing after constant".to_owned());
-                }
-                continue;
             } else if is_digit(cur) {
                 // here we parse numbers
                 let mut num: Vec<char> = vec![];
@@ -460,13 +419,31 @@ impl Tokenizer {
                         namecur = self.nextc();
                     }
                 }
-                self.tokens.push(Token {
-                    line,
-                    col,
-                    value: TokenValue::Name(name.iter().collect()),
-                });
-                if nameleftp {
-                    self.push_token(TokenValue::NameLeftP);
+                let namestr: String = name.iter().collect();
+
+                match namestr.as_str() {
+                    "NaN"     => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::NAN, None)}),
+                    "Inf"     => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::INFINITY, None)}),
+                    "Pi"      => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI, None)}),
+                    "E"       => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::E, None)}),
+                    "Sqrt2"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::SQRT_2, None)}),
+                    "Sqrt2Pi" => self.tokens.push(Token {line, col, value: TokenValue::Number(2.506_628_274_631_000_7, None)}),
+                    "Ln2"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_2, None)}),
+                    "Ln10"    => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_10, None)}),
+                    "Log10e"  => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG10_E, None)}),
+                    "Log2e"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG2_E, None)}),
+                    "Phi"     => self.tokens.push(Token {line, col, value: TokenValue::Number(1.618033988749894, None)}),
+                    "Tau"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI*2.0, None)}),
+                    _ => {
+                        self.tokens.push(Token {
+                            line,
+                            col,
+                            value: TokenValue::Name(namestr),
+                        });
+                        if nameleftp {
+                            self.push_token(TokenValue::NameLeftP);
+                        }
+                    },
                 }
             } else {
                 self.state = TokenizerState::Error("Unexpected character".to_owned());
