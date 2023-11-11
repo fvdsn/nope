@@ -131,6 +131,7 @@ impl Stdlib {
         def_two_args("min",  vec![Instruction::Min]);
         def_two_args("mult", vec![Instruction::Multiply]);
         def_two_args("div",  vec![Instruction::Divide]);
+        def_two_args("pow", vec![Instruction::Power]);
         def_two_args("modulo",     vec![Instruction::Modulo]);
         def_two_args("join_paths", vec![Instruction::JoinPaths]);
         def_two_args("write_text", vec![Instruction::WriteTextFileSync]);

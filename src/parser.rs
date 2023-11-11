@@ -35,6 +35,7 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     Modulo,
+    Power,
 }
 
 const MIN_PRECEDENCE: usize = 0;
@@ -56,6 +57,14 @@ fn operator_precedence(op: BinaryOperator) -> usize {
         BinaryOperator::Multiply => 12,
         BinaryOperator::Divide => 12,
         BinaryOperator::Modulo => 12,
+        BinaryOperator::Power => 13,
+    }
+}
+
+fn operator_associates_right(op: BinaryOperator) -> bool {
+    match op {
+        BinaryOperator::Power => true,
+        _ => false,
     }
 }
 
@@ -423,6 +432,7 @@ impl Parser {
                     ">="   => Some(BinaryOperator::GreaterOrEqual),
                     "+-="  => Some(BinaryOperator::AlmostEqual),
                     "!+-=" => Some(BinaryOperator::NotAlmostEqual),
+                    "**"   => Some(BinaryOperator::Power),
                     "<"    => Some(BinaryOperator::Less),
                     ">"    => Some(BinaryOperator::Greater),
                     "+"    => Some(BinaryOperator::Add),
@@ -1156,12 +1166,25 @@ impl Parser {
 
                 loop {
                     if let Some(op_ahead) = self.peek_binary_op() {
-                        if operator_precedence(op_ahead) <= operator_precedence(op) {
-                            break;
+                        if operator_associates_right(op_ahead) {
+                            if operator_precedence(op_ahead) < operator_precedence(op) {
+                                break;
+                            }
+                        } else {
+                            if operator_precedence(op_ahead) <= operator_precedence(op) {
+                                break;
+                            }
                         }
+
+                        let precedence_increment = if operator_precedence(op_ahead) == operator_precedence(op) {
+                            0
+                        } else {
+                            1
+                        };
+
                         self.parse_binary(
                             right_node_index,
-                            operator_precedence(op) + 1,
+                            operator_precedence(op) + precedence_increment,
                             var_name,
                         );
                         
@@ -2562,6 +2585,20 @@ mod tests {
               AstNode::BinaryOperator(1, BinaryOperator::Add, 0, 1),
               AstNode::Number(4, 1.0),
               AstNode::BinaryOperator(3, BinaryOperator::Add, 2, 3),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_binary_pow_pow() {
+        let mut parser = Parser::new(CONFIG, String::from("1**1**1"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(0, 1.0),
+              AstNode::Number(2, 1.0),
+              AstNode::Number(4, 1.0),
+              AstNode::BinaryOperator(3, BinaryOperator::Power, 1, 2),
+              AstNode::BinaryOperator(1, BinaryOperator::Power, 0, 3),
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }

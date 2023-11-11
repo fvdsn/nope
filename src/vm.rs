@@ -295,6 +295,7 @@ impl Vm {
                     BinaryOperator::Multiply       => { self.chunk.write(node_idx, Instruction::Multiply);},
                     BinaryOperator::Divide         => { self.chunk.write(node_idx, Instruction::Divide);},
                     BinaryOperator::Modulo         => { self.chunk.write(node_idx, Instruction::Modulo);},
+                    BinaryOperator::Power          => { self.chunk.write(node_idx, Instruction::Power);},
                 }
             },
             _ => {
@@ -738,6 +739,17 @@ impl Vm {
                         }
                         (b, a) => {
                             self.push(Value::Num(a.num_equiv() / b.num_equiv()));
+                        },
+                    }
+                },
+                Instruction::Power => {
+                    let ops = (self.pop(), self.pop());
+                    match ops {
+                        (Value::Num(val_b), Value::Num(val_a)) => {
+                            self.push(Value::Num(val_a.powf(val_b)));
+                        }
+                        (b, a) => {
+                            self.push(Value::Num(a.num_equiv().powf(b.num_equiv())));
                         },
                     }
                 },
