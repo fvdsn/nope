@@ -264,6 +264,9 @@ impl Vm {
                     UnaryOperator::Add => {
                         self.chunk.write(node_idx, Instruction::Num);
                     },
+                    UnaryOperator::BitwiseNot=> {
+                        self.chunk.write(node_idx, Instruction::BitwiseNot);
+                    },
                 }
             },
             AstNode::BinaryOperator(_, op, lexpr_node_idx, rexpr_node_idx) => {
@@ -296,6 +299,12 @@ impl Vm {
                     BinaryOperator::Divide         => { self.chunk.write(node_idx, Instruction::Divide);},
                     BinaryOperator::Modulo         => { self.chunk.write(node_idx, Instruction::Modulo);},
                     BinaryOperator::Power          => { self.chunk.write(node_idx, Instruction::Power);},
+                    BinaryOperator::BitwiseAnd     => { self.chunk.write(node_idx, Instruction::BitwiseAnd);},
+                    BinaryOperator::BitwiseOr      => { self.chunk.write(node_idx, Instruction::BitwiseOr);},
+                    BinaryOperator::BitwiseXor     => { self.chunk.write(node_idx, Instruction::BitwiseXor);},
+                    BinaryOperator::BitwiseLeftShift => { self.chunk.write(node_idx, Instruction::BitwiseLeftShift);},
+                    BinaryOperator::BitwiseRightShift => { self.chunk.write(node_idx, Instruction::BitwiseRightShift);},
+                    BinaryOperator::BitwiseZeroRightShift => { self.chunk.write(node_idx, Instruction::BitwiseZeroRightShift);},
                 }
             },
             _ => {
@@ -489,6 +498,17 @@ impl Vm {
                 Instruction::Not => {
                     let val = self.pop();
                     self.push(Value::Boolean(!val.is_truthy()));
+                },
+                Instruction::BitwiseNot => {
+                    let val = self.pop();
+                    match &val {
+                        Value::Num(num) => {
+                            self.push(Value::Num(!(*num as i32) as f64));
+                        },
+                        _ => {
+                            self.push(Value::Num(!(val.num_equiv() as i32) as f64));
+                        },
+                    }
                 },
                 Instruction::Bool => {
                     let val = self.pop();
@@ -785,6 +805,30 @@ impl Vm {
                             self.push(Value::Num(f64::max(a.num_equiv(), b.num_equiv())));
                         },
                     }
+                },
+                Instruction::BitwiseAnd => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) & (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::BitwiseOr => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) | (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::BitwiseXor => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) ^ (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::BitwiseLeftShift => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) << (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::BitwiseRightShift => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) >> (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::BitwiseZeroRightShift => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32 as u32) >> (b.num_equiv() as i32 as u32)) as i32 as f64));
                 },
                 Instruction::Random => {
                     let val: f64 = self.rng.gen();

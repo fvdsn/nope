@@ -18,6 +18,7 @@ pub enum UnaryOperator {
     Not,
     Negate,
     Add,
+    BitwiseNot,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -36,6 +37,12 @@ pub enum BinaryOperator {
     Divide,
     Modulo,
     Power,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseLeftShift,
+    BitwiseRightShift,
+    BitwiseZeroRightShift,
 }
 
 const MIN_PRECEDENCE: usize = 0;
@@ -58,6 +65,13 @@ fn operator_precedence(op: BinaryOperator) -> usize {
         BinaryOperator::Divide => 12,
         BinaryOperator::Modulo => 12,
         BinaryOperator::Power => 13,
+
+        BinaryOperator::BitwiseAnd => 7,
+        BinaryOperator::BitwiseOr => 5,
+        BinaryOperator::BitwiseXor => 6,
+        BinaryOperator::BitwiseLeftShift => 10,
+        BinaryOperator::BitwiseRightShift => 10,
+        BinaryOperator::BitwiseZeroRightShift => 10,
     }
 }
 
@@ -440,6 +454,12 @@ impl Parser {
                     "*"    => Some(BinaryOperator::Multiply),
                     "/"    => Some(BinaryOperator::Divide),
                     "%"    => Some(BinaryOperator::Modulo),
+                    "~|"   => Some(BinaryOperator::BitwiseOr),
+                    "~&"   => Some(BinaryOperator::BitwiseAnd),
+                    "~^"   => Some(BinaryOperator::BitwiseXor),
+                    "~<<"   => Some(BinaryOperator::BitwiseLeftShift),
+                    "~>>"   => Some(BinaryOperator::BitwiseRightShift),
+                    "~>>>"   => Some(BinaryOperator::BitwiseZeroRightShift),
                     _ => None, 
                 }
             }
@@ -1239,8 +1259,12 @@ impl Parser {
                         UnaryOperator::Not 
                     } else if operator == "-" {
                         UnaryOperator::Negate 
-                    } else { 
+                    } else if operator == "~!" {
+                        UnaryOperator::BitwiseNot
+                    } else if operator == "+" { 
                         UnaryOperator::Add 
+                    } else {
+                        panic!("unknown operator");
                     };
 
                     let op_token_index = self.index;

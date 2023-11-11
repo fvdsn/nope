@@ -90,11 +90,12 @@ fn is_unit(c:char) -> bool {
 fn is_operator(c:char) -> bool {
     return c == '+' || c == '*' || c == '/' || c == '=' 
         || c == '-' || c == '!' || c == '<' || c == '>'
-        || c == '%';
+        || c == '%' || c == '~';
 }
 
-const OPERATORS: [&str; 15] = [
+const OPERATORS: [&str; 22] = [
      "==", "!=", "<=", ">=", "+-=", "!+-=", "**",
+     "~<<", "~>>>", "~&", "~|", "~!", "~^", "~>>", 
      "<", ">", "+", "-", "*", "/", "!", "%", 
 ];
 
@@ -346,12 +347,17 @@ impl Tokenizer {
                 let mut str: Vec<char> = vec![];
                 let line = self.line;
                 let col = self.col;
+                let mut skipping = true;
                 loop {
                     let nextc = self.peek1();
                     if is_eof(nextc) || is_wp(nextc) || is_tildestr_separator(nextc) {
                         break;
+                    } else if skipping && nextc == '~' {
+                        self.nextc();
+                    } else {
+                        str.push(self.nextc());
+                        skipping = false;
                     }
-                    str.push(self.nextc());
                 }
                 self.tokens.push(Token {
                     line,
@@ -587,13 +593,13 @@ mod tests {
 
     #[test]
     fn test_parse_string_doctype() {
-        let mut program = Tokenizer::new(String::from("~!DOCTYPE"));
+        let mut program = Tokenizer::new(String::from("~~!DOCTYPE"));
         program.tokenize();
         assert_eq!(
             program.tokens,
             vec![
                 Token{line:1, col:1, value: TokenValue::String(String::from("!DOCTYPE"))},
-                Token{line:1, col:9, value: TokenValue::Eof},
+                Token{line:1, col:10, value: TokenValue::Eof},
             ],
         );
         assert_eq!(program.state, TokenizerState::Done);
