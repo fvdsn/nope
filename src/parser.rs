@@ -963,6 +963,7 @@ impl Parser {
 
         if self.peek_nleftp() { // function call is of the form 'foo(...)' instead of 'foo ...'
             explicit_func_call = true;
+            uses_commas = true;
             self.nextt();
         }
 
@@ -1874,6 +1875,45 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_func_implicit() {
+        let mut parser = Parser::new(CONFIG, String::from("random"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::FunctionCall(0, "random".to_owned(), vec![])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_func_explicit() {
+        let mut parser = Parser::new(CONFIG, String::from("random()"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::FunctionCall(1, "random".to_owned(), vec![]) //FIXME index ?
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_func_explicit2() {
+        let mut parser = Parser::new(CONFIG, String::from("add(1,2)"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 1.0),
+            AstNode::Number(4, 2.0),
+            AstNode::FunctionCall(4, "add".to_owned(), vec![0, 1])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_func_explicit_no_commas() {
+        let mut parser = Parser::new(CONFIG, String::from("add(1 2)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Error);
+    }
+
+    #[test]
     fn test_parse_func_0() {
         let mut parser = Parser::new(CONFIG, String::from("|| 42"));
         parser.parse();
@@ -2542,6 +2582,34 @@ mod tests {
             AstNode::Number(10, 1.0),
             AstNode::BinaryOperator(9, BinaryOperator::Add, 7, 8),
             AstNode::BinaryOperator(5, BinaryOperator::Equal, 4, 9),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_func_no_parenthesis_mixed_with_operators() {
+        let mut parser = Parser::new(CONFIG, String::from("neg 3 + neg 5"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.0),
+            AstNode::FunctionCall(1, "neg".to_owned(), vec![0]),
+            AstNode::Number(4, 5.0),
+            AstNode::FunctionCall(4, "neg".to_owned(), vec![2]),
+            AstNode::BinaryOperator(2, BinaryOperator::Add, 1, 3)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_func_no_parenthesis_mixed_with_operators2() {
+        let mut parser = Parser::new(CONFIG, String::from("neg(3 + not 5)"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 3.0),
+            AstNode::Number(5, 5.0),
+            AstNode::FunctionCall(5, "not".to_owned(), vec![1]),
+            AstNode::BinaryOperator(3, BinaryOperator::Add, 0, 2),
+            AstNode::FunctionCall(5, "neg".to_owned(), vec![3])
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
