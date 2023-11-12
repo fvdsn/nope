@@ -302,9 +302,13 @@ impl Vm {
                     BinaryOperator::BitwiseAnd     => { self.chunk.write(node_idx, Instruction::BitwiseAnd);},
                     BinaryOperator::BitwiseOr      => { self.chunk.write(node_idx, Instruction::BitwiseOr);},
                     BinaryOperator::BitwiseXor     => { self.chunk.write(node_idx, Instruction::BitwiseXor);},
-                    BinaryOperator::BitwiseLeftShift => { self.chunk.write(node_idx, Instruction::BitwiseLeftShift);},
-                    BinaryOperator::BitwiseRightShift => { self.chunk.write(node_idx, Instruction::BitwiseRightShift);},
+                    BinaryOperator::BitwiseLeftShift      => { self.chunk.write(node_idx, Instruction::BitwiseLeftShift);},
+                    BinaryOperator::BitwiseRightShift     => { self.chunk.write(node_idx, Instruction::BitwiseRightShift);},
                     BinaryOperator::BitwiseZeroRightShift => { self.chunk.write(node_idx, Instruction::BitwiseZeroRightShift);},
+                    BinaryOperator::I32Add         => { self.chunk.write(node_idx, Instruction::I32Add);},
+                    BinaryOperator::I32Subtract    => { self.chunk.write(node_idx, Instruction::I32Subtract);},
+                    BinaryOperator::I32Multiply    => { self.chunk.write(node_idx, Instruction::I32Multiply);},
+                    BinaryOperator::I32Divide      => { self.chunk.write(node_idx, Instruction::I32Divide);},
                 }
             },
             _ => {
@@ -829,6 +833,22 @@ impl Vm {
                 Instruction::BitwiseZeroRightShift => {
                     let (b, a) = (self.pop(), self.pop());
                     self.push(Value::Num(((a.num_equiv() as i32 as u32) >> (b.num_equiv() as i32 as u32)) as i32 as f64));
+                },
+                Instruction::I32Add => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) + (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::I32Subtract => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) - (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::I32Multiply => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) * (b.num_equiv() as i32)) as f64));
+                },
+                Instruction::I32Divide => {
+                    let (b, a) = (self.pop(), self.pop());
+                    self.push(Value::Num(((a.num_equiv() as i32) / (b.num_equiv() as i32)) as f64));
                 },
                 Instruction::Random => {
                     let val: f64 = self.rng.gen();

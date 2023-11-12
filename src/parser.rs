@@ -43,6 +43,10 @@ pub enum BinaryOperator {
     BitwiseLeftShift,
     BitwiseRightShift,
     BitwiseZeroRightShift,
+    I32Add,
+    I32Subtract,
+    I32Multiply,
+    I32Divide,
 }
 
 const MIN_PRECEDENCE: usize = 0;
@@ -72,6 +76,11 @@ fn operator_precedence(op: BinaryOperator) -> usize {
         BinaryOperator::BitwiseLeftShift => 10,
         BinaryOperator::BitwiseRightShift => 10,
         BinaryOperator::BitwiseZeroRightShift => 10,
+
+        BinaryOperator::I32Add => 11,
+        BinaryOperator::I32Subtract => 11,
+        BinaryOperator::I32Multiply => 12,
+        BinaryOperator::I32Divide => 12,
     }
 }
 
@@ -457,6 +466,10 @@ impl Parser {
                     "~|"   => Some(BinaryOperator::BitwiseOr),
                     "~&"   => Some(BinaryOperator::BitwiseAnd),
                     "~^"   => Some(BinaryOperator::BitwiseXor),
+                    "~+"   => Some(BinaryOperator::I32Add),
+                    "~-"   => Some(BinaryOperator::I32Subtract),
+                    "~*"   => Some(BinaryOperator::I32Multiply),
+                    "~/"   => Some(BinaryOperator::I32Divide),
                     "~<<"   => Some(BinaryOperator::BitwiseLeftShift),
                     "~>>"   => Some(BinaryOperator::BitwiseRightShift),
                     "~>>>"   => Some(BinaryOperator::BitwiseZeroRightShift),
