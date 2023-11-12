@@ -88,6 +88,7 @@ impl Stdlib {
         def_one_arg("lower",  vec![Instruction::Lower]);
         def_one_arg("trim",   vec![Instruction::Trim]);
         def_one_arg("shh",    vec![Instruction::Silence]);
+        def_one_arg("bitstr", vec![Instruction::Bitstr]);
         def_one_arg("read_text", vec![Instruction::ReadTextFileSync]);
         def_one_arg("is_even", vec![
             Instruction::ConstantNum(2.0),

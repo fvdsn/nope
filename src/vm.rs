@@ -851,6 +851,21 @@ impl Vm {
                     let (b, a) = (self.pop(), self.pop());
                     self.push(Value::Num(((a.num_equiv() as i32) / (b.num_equiv() as i32)) as f64));
                 },
+                Instruction::Bitstr => {
+                    let val = self.pop().num_equiv() as i32;
+                    let mut bitstr: Vec<char> = vec![];
+                    for i in 0..32 {
+                        let idx = 1 << (31-i);
+                        if (val & idx) != 0 {
+                            bitstr.push('1');
+                        } else {
+                            bitstr.push('0');
+                        }
+                    }
+
+                    let ref_val = self.intern(bitstr.iter().collect());
+                    self.push(Value::String(ref_val));
+                },
                 Instruction::Random => {
                     let val: f64 = self.rng.gen();
                     self.push(Value::Num(val));

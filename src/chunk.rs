@@ -96,6 +96,7 @@ pub enum Instruction {
     AlmostEqual,
     Replace,
     Silence,
+    Bitstr,
 }
 
 #[derive(PartialEq, Debug, Clone)]
