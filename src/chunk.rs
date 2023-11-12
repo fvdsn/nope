@@ -44,6 +44,9 @@ pub enum Instruction {
     ConstantNum(f64),
     DefineGlobal(usize),
     GetGlobal(usize),
+    Jump(usize),
+    JumpIfFalse(usize),
+    Pop,
     Return,
     Negate,
     Add,
@@ -84,7 +87,6 @@ pub enum Instruction {
     Acos,
     Tan,
     Inv,
-    //
     Acosh,
     Sinh,
     Asin,
@@ -106,7 +108,6 @@ pub enum Instruction {
     Fround,
     Trunc,
     Sign,
-    //
     Str,
     Upper,
     Lower,
@@ -152,6 +153,14 @@ impl Chunk {
         return cst_idx;
     }
 
+    pub fn last_instr_idx(&self) -> usize {
+        if self.code.is_empty() {
+            0
+        } else {
+            self.code.len()-1
+        }
+    }
+
     pub fn read_constant(&self, index: usize) -> Value {
         self.constants[index]
     }
@@ -167,6 +176,10 @@ impl Chunk {
     pub fn write(&mut self, ast_node_idx: usize, op: Instruction) {
         self.code.push(op);
         self.ast_map.push(ast_node_idx);
+    }
+
+    pub fn rewrite(&mut self, instr_idx: usize, op: Instruction) {
+        self.code[instr_idx] = op;
     }
 
     pub fn pretty_print(&self) {

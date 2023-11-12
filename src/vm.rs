@@ -82,6 +82,10 @@ impl Vm {
         self.stack.pop().expect("Empty Stack")
     }
 
+    fn top(&mut self) -> Value {
+        self.stack[self.stack.len()-1]
+    }
+
     fn intern(&mut self, name: String) -> GcRef<String> {
     //    self.mark_and_sweep();
         self.gc.intern(name)
@@ -235,6 +239,41 @@ impl Vm {
                 let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
                 self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
             },
+            AstNode::IfElse(_, cond_expr_node_idx, val_expr_node_idx, else_expr_node_idx) => {
+                if !self.compile_node(ast, *cond_expr_node_idx) {
+                    println!("error compiling if condition");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::JumpIfFalse(0));
+                let jmp_to_else_idx = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Pop);
+
+                if !self.compile_node(ast, *val_expr_node_idx) {
+                    println!("error compiling true branch of if block");
+                    return false;
+                }
+
+                self.chunk.write(node_idx, Instruction::JumpIfFalse(0));
+                let jmp_to_end_idx = self.chunk.last_instr_idx();
+
+                self.chunk.write(node_idx, Instruction::Pop);
+                let jmp_to_else_target_idx = self.chunk.last_instr_idx();
+
+                if !self.compile_node(ast, *else_expr_node_idx) {
+                    println!("error compiling false branch of if block");
+                    return false;
+                }
+
+                let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(jmp_to_else_idx, Instruction::JumpIfFalse(
+                    jmp_to_else_target_idx - jmp_to_else_idx - 1
+                ));
+
+                self.chunk.rewrite(jmp_to_end_idx, Instruction::Jump(
+                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                ));
+            },
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
                     if !self.compile_node(ast, *arg) {
@@ -340,12 +379,16 @@ impl Vm {
 
     pub fn run(&mut self) -> InterpretResult {
         loop {
+            // println!("ip:{}", self.ip);
             let instr = self.chunk.code[self.ip];
             self.ip += 1;
             match instr {
                 Instruction::Return => {
                     //println!("{:?}", self.pop());
                     return InterpretResult::Ok;
+                },
+                Instruction::Pop => {
+                    self.pop();
                 },
                 Instruction::Silence => {
                     self.pop();
@@ -377,6 +420,17 @@ impl Vm {
                             let global_name = self.gc.deref(global_name);
                             panic!("Undefined global {}", global_name);
                         }
+                    }
+                },
+                Instruction::Jump(offset) => {
+                    // println!("jump:{}", offset);
+                    self.ip += offset;
+                },
+                Instruction::JumpIfFalse(offset) => {
+                    let cond_value = self.top().is_truthy(); 
+                    if !cond_value {
+                        // println!("false, jump:{}", offset);
+                        self.ip += offset;
                     }
                 },
                 Instruction::Num => {
