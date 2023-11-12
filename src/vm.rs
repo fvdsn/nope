@@ -866,6 +866,90 @@ impl Vm {
                     let ref_val = self.intern(bitstr.iter().collect());
                     self.push(Value::String(ref_val));
                 },
+                Instruction::Acosh => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::acosh(val)));
+                },
+                Instruction::Sinh  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::sinh(val)));
+                },
+                Instruction::Asin  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::asin(val)));
+                },
+                Instruction::Asinh => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::asinh(val)));
+                },
+                Instruction::Cosh  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::cosh(val)));
+                },
+                Instruction::Tanh  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::tanh(val)));
+                },
+                Instruction::Atan  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::atan(val)));
+                },
+                Instruction::Atanh => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::atanh(val)));
+                },
+                Instruction::Atan2 => {
+                    let (b, a) = (self.pop().num_equiv(), self.pop().num_equiv());
+                    self.push(Value::Num(f64::atan2(a, b)));
+                },
+                Instruction::Log2  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::log2(val)));
+                },
+                Instruction::Log10 => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::log10(val)));
+                },
+                Instruction::Ln1p  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::ln_1p(val)));
+                },
+                Instruction::Ln    => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::ln(val)));
+                },
+                Instruction::Exp   => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::exp(val)));
+                },
+                Instruction::Expm1 => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::exp_m1(val)));
+                },
+                Instruction::Sqrt  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::sqrt(val)));
+                },
+                Instruction::Cbrt  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::cbrt(val)));
+                },
+                Instruction::Round => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::round(val)));
+                },
+                Instruction::Trunc => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::trunc(val)));
+                },
+                Instruction::Sign  => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(f64::signum(val)));
+                },
+                Instruction::Fround => {
+                    let val = self.pop().num_equiv();
+                    self.push(Value::Num(val as f32 as f64));
+                },
                 Instruction::Random => {
                     let val: f64 = self.rng.gen();
                     self.push(Value::Num(val));
