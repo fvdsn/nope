@@ -158,6 +158,8 @@ impl Stdlib {
         def_two_args("modulo",     vec![Instruction::Modulo]);
         def_two_args("join_paths", vec![Instruction::JoinPaths]);
         def_two_args("write_text", vec![Instruction::WriteTextFileSync]);
+        def_two_args("from_unit", vec![Instruction::FromUnit]);
+        def_two_args("to_unit", vec![Instruction::ToUnit]);
 
         let three_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },

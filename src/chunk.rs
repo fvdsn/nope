@@ -118,6 +118,8 @@ pub enum Instruction {
     LessOrEqual,
     AlmostEqual,
     Replace,
+    FromUnit,
+    ToUnit,
     Silence,
     Bitstr,
 }

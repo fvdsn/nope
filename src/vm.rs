@@ -9,6 +9,10 @@ use crate::{
         UnaryOperator,
         BinaryOperator,
     },
+    units::{
+        convert_unit_to_si,
+        convert_si_to_unit,
+    },
     penv::{
         Env,
     },
@@ -865,6 +869,44 @@ impl Vm {
 
                     let ref_val = self.intern(bitstr.iter().collect());
                     self.push(Value::String(ref_val));
+                },
+                Instruction::FromUnit => {
+                    let (val, unit) = (self.pop().num_equiv(), self.pop());
+                    match &unit {
+                        Value::String(ref_unit) => {
+                            let str_unit = self.gc.deref(*ref_unit);
+                            match convert_unit_to_si(val, str_unit) {
+                                Some(num) => {
+                                    self.push(Value::Num(num));
+                                },
+                                None => {
+                                    self.push(Value::Num(f64::NAN));
+                                },
+                            }
+                        }
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        }
+                    }
+                },
+                Instruction::ToUnit => {
+                    let (val, unit) = (self.pop().num_equiv(), self.pop());
+                    match &unit {
+                        Value::String(ref_unit) => {
+                            let str_unit = self.gc.deref(*ref_unit);
+                            match convert_si_to_unit(val, str_unit) {
+                                Some(num) => {
+                                    self.push(Value::Num(num));
+                                },
+                                None => {
+                                    self.push(Value::Num(f64::NAN));
+                                },
+                            }
+                        }
+                        _ => {
+                            self.push(Value::Num(f64::NAN));
+                        }
+                    }
                 },
                 Instruction::Acosh => {
                     let val = self.pop().num_equiv();

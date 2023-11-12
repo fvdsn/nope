@@ -1,5 +1,20 @@
 use std::f64;
 
+pub fn convert_si_to_unit(num:f64, unit:&str) -> Option<f64> {
+    match convert_unit_to_si(1.0, unit) {
+        Some(factor) => { 
+            if unit == "F" {
+                Some((num - 273.15) * (9.0/5.0) + 32.0)
+            } else if unit == "C" {
+                Some(num - 273.15)
+            } else {
+                Some(num / factor)
+            }
+        },
+        None => None,
+    }
+}
+
 pub fn convert_unit_to_si(mut num:f64, unit:&str) -> Option<f64> {
     match unit {
         "pi" => {num *= f64::consts::PI},
