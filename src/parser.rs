@@ -438,6 +438,14 @@ impl Parser {
         }
     }
 
+    fn peek_else(&self) -> bool {
+        let token = &self.peekt();
+        match token {
+            Token {value: TokenValue::Name(name), ..} => name == "else",
+            _ => false,
+        }
+    }
+
     fn peek_binary_op(&self) -> Option<BinaryOperator> {
         let token = &self.peekt();
         return match token {
@@ -872,16 +880,21 @@ impl Parser {
         }
 
         let expr_idx = self.cur_ast_node_index();
-        if self.peek_closing_element() {
-            let (eline, ecol) = self.peek_line_col();
-            self.push_info(line, col, "this if is missing an expression".to_owned());
-            self.push_incomplete(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
-            return;
-        }
+        if self.peek_else() {
+            self.nextt();
+            if self.peek_closing_element() {
+                let (eline, ecol) = self.peek_line_col();
+                self.push_info(line, col, "this if is missing an expression".to_owned());
+                self.push_incomplete(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
+                return;
+            }
 
-        self.parse_expression(false, false, None);
-        if self.parsing_failed() {
-            return;
+            self.parse_expression(false, false, None);
+            if self.parsing_failed() {
+                return;
+            }
+        } else {
+            self.ast.push(AstNode::Void(if_idx));
         }
 
         let expr2_idx = self.cur_ast_node_index();
@@ -2081,37 +2094,51 @@ mod tests {
 
     #[test]
     fn test_parse_ife() {
-        let mut parser = Parser::new(CONFIG, String::from("(if true 99 64)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if true 99 else 64)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Boolean(2, true),
            AstNode::Number(3, 99.0),
-           AstNode::Number(4, 64.0),
+           AstNode::Number(5, 64.0),
            AstNode::IfElse(1, 0, 1, 2)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
-    fn test_parse_ife_wrong1() {
+    fn test_parse_if() {
         let mut parser = Parser::new(CONFIG, String::from("(if true 99)"));
         parser.parse();
-        assert_eq!(parser.state, ParserState::Error);
+        assert_eq!(parser.ast, vec![
+           AstNode::Boolean(2, true),
+           AstNode::Number(3, 99.0),
+           AstNode::Void(1),
+           AstNode::IfElse(1, 0, 1, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
-    fn test_parse_ife_wrong2() {
-        let mut parser = Parser::new(CONFIG, String::from("(if true)"));
-        parser.parse();
-        assert_eq!(parser.state, ParserState::Error);
-    }
-
-    #[test]
-    fn test_parse_ife_wrong3() {
+    fn test_parse_ife_incomplete() {
         let mut parser = Parser::new(CONFIG, String::from("(if)"));
         parser.parse();
-        assert_eq!(parser.state, ParserState::Error);
+        assert_eq!(parser.state, ParserState::Incomplete);
     }
+
+    #[test]
+    fn test_parse_ife_incomplete2() {
+        let mut parser = Parser::new(CONFIG, String::from("(if true)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Incomplete);
+    }
+
+    #[test]
+    fn test_parse_ife_incomplete3() {
+        let mut parser = Parser::new(CONFIG, String::from("(if true 99 else)"));
+        parser.parse();
+        assert_eq!(parser.state, ParserState::Incomplete);
+    }
+
 
     #[test]
     fn test_parse_do() {
