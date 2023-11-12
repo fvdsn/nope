@@ -10,6 +10,7 @@ pub enum TokenValue {
     Colon,
     Dot,
     Pipe,
+    PipeLeft,
     Comma,
     Equal,
     Eof,
@@ -253,6 +254,9 @@ impl Tokenizer {
                     //  - [1]foo vs [[1] foo] 
                     self.push_token(TokenValue::Swp);
                 }
+            } else if cur == '<' && self.peek1() == '-' {
+                self.push_token(TokenValue::PipeLeft);
+                self.nextc();
             } else if self.match_and_push_operator() {
                 continue;
             } else if cur == '=' {

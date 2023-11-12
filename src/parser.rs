@@ -1265,6 +1265,9 @@ impl Parser {
                     }
                 };
             },
+            Token {value: TokenValue::PipeLeft, ..} => {
+                self.parse_expression(false, false, None);
+            },
             Token {value: TokenValue::Operator(ref operator), ..} => {
                 if operator == "!" || operator == "-"  || operator == "+" {
 
