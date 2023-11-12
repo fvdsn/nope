@@ -14,6 +14,7 @@ mod vm;
 mod repl;
 mod gc;
 mod objects;
+mod consts;
 
 
 use crate::{

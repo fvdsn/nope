@@ -2,6 +2,7 @@ use rand::Rng;
 use std::time::SystemTime;
 use std::path::Path;
 use crate::{
+    consts::EPSILON,
     parser::{
         Parser,
         AstNode,
@@ -683,7 +684,7 @@ impl Vm {
                     let ops = (self.pop(), self.pop());
                     match ops {
                         (Value::Num(val_b), Value::Num(val_a)) => {
-                            self.push(Value::Boolean(f64::abs(val_a - val_b) <= 0.00000001));
+                            self.push(Value::Boolean(f64::abs(val_a - val_b) <= EPSILON));
                         },
                         (b, a) => {
                             self.push(Value::Boolean(a.num_equiv() == b.num_equiv()));

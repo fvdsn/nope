@@ -1,3 +1,5 @@
+use crate::consts::EPSILON;
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum TokenValue {
     LeftSqBrkt,
@@ -500,16 +502,32 @@ impl Tokenizer {
                 match namestr.as_str() {
                     "NaN"     => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::NAN, None)}),
                     "Inf"     => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::INFINITY, None)}),
-                    "Pi"      => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI, None)}),
+                    "PI"      => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI, None)}),
                     "E"       => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::E, None)}),
-                    "Sqrt2"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::SQRT_2, None)}),
-                    "Sqrt2Pi" => self.tokens.push(Token {line, col, value: TokenValue::Number(2.506_628_274_631_000_7, None)}),
-                    "Ln2"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_2, None)}),
-                    "Ln10"    => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_10, None)}),
-                    "Log10e"  => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG10_E, None)}),
-                    "Log2e"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG2_E, None)}),
-                    "Phi"     => self.tokens.push(Token {line, col, value: TokenValue::Number(1.618033988749894, None)}),
-                    "Tau"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI*2.0, None)}),
+                    "SQRT_2"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::SQRT_2, None)}),
+                    "SQRT_2PI" => self.tokens.push(Token {line, col, value: TokenValue::Number(2.506_628_274_631_000_7, None)}),
+                    "LN_2"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_2, None)}),
+                    "LN_10"    => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LN_10, None)}),
+                    "LOG2_10"  => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG2_10, None)}),
+                    "LOG2_E"   => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG2_E, None)}),
+                    "LOG10_2"  => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG10_2, None)}),
+                    "LOG10_E"  => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::LOG10_E, None)}),
+                    "PHI"     => self.tokens.push(Token {line, col, value: TokenValue::Number(1.618033988749894, None)}),
+                    "TAU"     => self.tokens.push(Token {line, col, value: TokenValue::Number(std::f64::consts::PI*2.0, None)}),
+                    "EPSILON" => self.tokens.push(Token {line, col, value: TokenValue::Number(EPSILON, None)}),
+                    "MAX_F64" => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::MAX, None)}),
+                    "MIN_F64" => self.tokens.push(Token {line, col, value: TokenValue::Number(f64::MIN, None)}),
+                    "MAX_U32" => self.tokens.push(Token {line, col, value: TokenValue::Number(u32::MAX as f64, None)}),
+                    "MAX_I32" => self.tokens.push(Token {line, col, value: TokenValue::Number(i32::MAX as f64, None)}),
+                    "MIN_I32" => self.tokens.push(Token {line, col, value: TokenValue::Number(i32::MIN as f64, None)}),
+                    "MAX_U16" => self.tokens.push(Token {line, col, value: TokenValue::Number(u16::MAX as f64, None)}),
+                    "MAX_I16" => self.tokens.push(Token {line, col, value: TokenValue::Number(i16::MAX as f64, None)}),
+                    "MIN_I16" => self.tokens.push(Token {line, col, value: TokenValue::Number(i16::MIN as f64, None)}),
+                    "MAX_U8"  => self.tokens.push(Token {line, col, value: TokenValue::Number(u8::MAX as f64, None)}),
+                    "MAX_I8"  => self.tokens.push(Token {line, col, value: TokenValue::Number(i8::MAX as f64, None)}),
+                    "MIN_I8"  => self.tokens.push(Token {line, col, value: TokenValue::Number(i8::MIN as f64, None)}),
+                    "MAX_INT" => self.tokens.push(Token {line, col, value: TokenValue::Number(((2 as i64).pow(53)-1) as f64, None)}),
+                    "MIN_INT" => self.tokens.push(Token {line, col, value: TokenValue::Number(-((2 as i64).pow(53)-1) as f64, None)}),
                     _ => {
                         self.tokens.push(Token {
                             line,
