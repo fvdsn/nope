@@ -108,7 +108,6 @@ pub enum AstNode {
     GlobalLet(usize, String, usize, usize),
     Set(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
-    If(usize, usize, usize), // if $cond $expr1 
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
     ValueReference(usize, String),    // reference to the variable 'String' that contains a value
 FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
@@ -256,11 +255,6 @@ impl Parser {
                 println!("{}do", " ".repeat(original_indent));
                 self._pretty_print_ast(*expr_1, indent + 2, false);
                 self._pretty_print_ast(*expr_2, indent, false);
-            },
-            AstNode::If(_, cond, expr) => {
-                println!("{}if", " ".repeat(original_indent));
-                self._pretty_print_ast(*cond, indent + 2, false);
-                self._pretty_print_ast(*expr, indent + 2, false);
             },
             AstNode::Set(_, target, expr) => {
                 println!("{}set", " ".repeat(original_indent));
@@ -790,38 +784,6 @@ impl Parser {
         }
     }
 
-    fn parse_if(&mut self) {
-        // parses if cond expr
-        // - if must have already been consumed
-        // - parses and puts the cond & expr AstNodes on the ast stack
-        // - adds a If AstNode referencing the cond and the expr on top of the ast stack
-        
-        let (line, col) = self.peek_line_col();
-        if self.peek_closing_element() {
-            self.push_error(line, col, "ERROR: expected condition after 'if'".to_owned());
-            return;
-        }
-
-        let if_idx = self.index;
-        self.parse_expression(false, false, None);
-        if self.parsing_failed() {
-            return;
-        }
-        let cond_idx = self.cur_ast_node_index();
-        if self.peek_closing_element() {
-            let (eline, ecol) = self.peek_line_col();
-            self.push_info(line, col, "this if is missing an expression".to_owned());
-            self.push_error(eline, ecol, "ERROR: expected expression for 'if'".to_owned());
-            return;
-        }
-        self.parse_expression(false, false, None);
-        if self.parsing_failed() {
-            return;
-        }
-        let expr_idx = self.cur_ast_node_index();
-        self.ast.push(AstNode::If(if_idx, cond_idx, expr_idx));
-    }
-
     fn parse_set(&mut self) {
         // parses set target expr
         // - set must have already been consumed
@@ -887,7 +849,7 @@ impl Parser {
     fn parse_ife(&mut self) {
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
-            self.push_error(line, col, "ERROR: expected condition after 'ife'".to_owned());
+            self.push_incomplete(line, col, "ERROR: expected condition after 'ife'".to_owned());
             return;
         }
 
@@ -900,7 +862,7 @@ impl Parser {
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_info(line, col, "this if is missing an expression".to_owned());
-            self.push_error(eline, ecol, "ERROR: expected success expression for 'if'".to_owned());
+            self.push_incomplete(eline, ecol, "ERROR: expected success expression for 'if'".to_owned());
             return;
         }
 
@@ -913,7 +875,7 @@ impl Parser {
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_info(line, col, "this if is missing an expression".to_owned());
-            self.push_error(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
+            self.push_incomplete(eline, ecol, "ERROR: expected else expression for 'if'".to_owned());
             return;
         }
 
@@ -1316,8 +1278,6 @@ impl Parser {
                 } else if name == "set" {
                     self.parse_set();
                 } else if name == "if" {
-                    self.parse_if();
-                } else if name == "ife" {
                     self.parse_ife();
                 } else if name == "do" {
                     self.parse_do();
@@ -2121,7 +2081,7 @@ mod tests {
 
     #[test]
     fn test_parse_ife() {
-        let mut parser = Parser::new(CONFIG, String::from("(ife true 99 64)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if true 99 64)"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Boolean(2, true),
@@ -2134,46 +2094,20 @@ mod tests {
 
     #[test]
     fn test_parse_ife_wrong1() {
-        let mut parser = Parser::new(CONFIG, String::from("(ife true 99)"));
+        let mut parser = Parser::new(CONFIG, String::from("(if true 99)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_ife_wrong2() {
-        let mut parser = Parser::new(CONFIG, String::from("(ife true)"));
-        parser.parse();
-        assert_eq!(parser.state, ParserState::Error);
-    }
-
-    #[test]
-    fn test_parse_ife_wrong3() {
-        let mut parser = Parser::new(CONFIG, String::from("(ife)"));
-        parser.parse();
-        assert_eq!(parser.state, ParserState::Error);
-    }
-
-    #[test]
-    fn test_parse_if() {
-        let mut parser = Parser::new(CONFIG, String::from("(if true 99)"));
-        parser.parse();
-        assert_eq!(parser.ast, vec![
-           AstNode::Boolean(2, true),
-           AstNode::Number(3, 99.0),
-           AstNode::If(1, 0, 1)
-        ]);
-        assert_eq!(parser.state, ParserState::Done);
-    }
-
-    #[test]
-    fn test_parse_if_wrong1() {
         let mut parser = Parser::new(CONFIG, String::from("(if true)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
-    fn test_parse_if_wrong2() {
+    fn test_parse_ife_wrong3() {
         let mut parser = Parser::new(CONFIG, String::from("(if)"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
