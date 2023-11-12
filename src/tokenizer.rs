@@ -78,6 +78,10 @@ fn is_digit(c:char) -> bool {
     return c.is_ascii_digit();
 }
 
+fn is_hexdigit(c:char) -> bool {
+    return c.is_ascii_hexdigit();
+}
+
 fn is_alpha(c:char) -> bool {
     return c.is_alphabetic();
 }
@@ -288,58 +292,123 @@ impl Tokenizer {
 
             } else if is_digit(cur) {
                 // here we parse numbers
-                let mut num: Vec<char> = vec![];
-                let mut unit: Vec<char> = vec![];
                 let line = self.line;
                 let col = self.col;
-                let mut dotcount = 0;
-                let mut numcur = cur;
                 let mut error = false;
-                loop {
-                    if numcur != '_' {
-                        num.push(numcur);
-                    }
 
-                    let nextc = self.peek1();
-
-                    if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
-                        break;
-                    } else if is_digit(nextc) || nextc == '_' {
-                        numcur = self.nextc();
-                    } else if nextc == '.' {
-                        dotcount += 1;
-                        if dotcount > 1 {
-                            self.state = TokenizerState::Error("Too many dots '.' in number".to_owned());
+                if cur == '0' && self.peek1() == 'b' {
+                    // here we parse 0b1101110 numbers
+                    let mut num: Vec<char> = vec![];
+                    self.nextc();
+                    loop {
+                        let numcur = self.nextc();
+                        if numcur == '0' || numcur == '1' {
+                            num.push(numcur);
+                        } else if numcur != '_' {
+                            self.state = TokenizerState::Error("This binary number contains unexpected characters".to_owned());
                             error = true;
                             break;
                         }
-                        numcur = self.nextc();
-                    } else if is_alpha(nextc) {
-                        loop {
-                            let nextu = self.peek1();
-                            if is_unit(nextu) {
-                                unit.push(self.nextc());
-                            } else {
+
+                        if num.len() > 32 {
+                            self.state = TokenizerState::Error("This binary number encodes too many bits (>32)".to_owned());
+                            error = true;
+                            break;
+                        }
+
+                        let nextc = self.peek1();
+
+                        if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
+                            break;
+                        }
+                    }
+                    if !error {
+                        let numstr: String = num.iter().collect();
+                        let val = usize::from_str_radix(&numstr, 2).unwrap() as f64;
+                        self.tokens.push(Token { line, col, value: TokenValue::Number(val, None) });
+                    }
+                } else if cur == '0' && self.peek1() == 'x' {
+                    // here we parse 0xdeadbeef numbers
+                    let mut num: Vec<char> = vec![];
+                    self.nextc();
+                    loop {
+                        let numcur = self.nextc();
+                        if is_hexdigit(numcur) {
+                            num.push(numcur);
+                        } else if numcur != '_' {
+                            self.state = TokenizerState::Error("This hexadecimal number contains unexpected characters".to_owned());
+                            error = true;
+                            break;
+                        }
+
+                        if num.len() > 8 {
+                            self.state = TokenizerState::Error("This hexadecimal number encodes too many bits (>32)".to_owned());
+                            error = true;
+                            break;
+                        }
+
+                        let nextc = self.peek1();
+
+                        if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
+                            break;
+                        }
+                    }
+                    if !error {
+                        let numstr: String = num.iter().collect();
+                        let val = usize::from_str_radix(&numstr, 16).unwrap() as f64;
+                        self.tokens.push(Token { line, col, value: TokenValue::Number(val, None) });
+                    }
+                } else {
+                    let mut num: Vec<char> = vec![];
+                    let mut unit: Vec<char> = vec![];
+                    let mut dotcount = 0;
+                    let mut numcur = cur;
+                    loop {
+                        if numcur != '_' {
+                            num.push(numcur);
+                        }
+
+                        let nextc = self.peek1();
+
+                        if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
+                            break;
+                        } else if is_digit(nextc) || nextc == '_' {
+                            numcur = self.nextc();
+                        } else if nextc == '.' {
+                            dotcount += 1;
+                            if dotcount > 1 {
+                                self.state = TokenizerState::Error("Too many dots '.' in number".to_owned());
+                                error = true;
                                 break;
                             }
+                            numcur = self.nextc();
+                        } else if is_alpha(nextc) {
+                            loop {
+                                let nextu = self.peek1();
+                                if is_unit(nextu) {
+                                    unit.push(self.nextc());
+                                } else {
+                                    break;
+                                }
+                            }
+                            break;
+                        } else {
+                            self.state = TokenizerState::Error("This number contains unexpected characters".to_owned());
+                            error = true;
+                            break;
                         }
-                        break;
-                    } else {
-                        self.state = TokenizerState::Error("The number contains unexpected characters".to_owned());
-                        error = true;
-                        break;
                     }
-                }
-                if !error {
-                    let numstr: String = num.iter().collect();
-                    let unitstr: String = unit.iter().collect();
-                    match numstr.parse::<f64>() {
-                        Ok(val) => self.tokens.push(Token {
-                            line,
-                            col,
-                            value: TokenValue::Number(val, if !unitstr.is_empty() { Some(unitstr) } else {None}),
-                        }),
-                        Err(e) => self.state = TokenizerState::Error(e.to_string())
+                    if !error {
+                        let numstr: String = num.iter().collect();
+                        let unitstr: String = unit.iter().collect();
+                        match numstr.parse::<f64>() {
+                            Ok(val) => self.tokens.push(Token {
+                                line,
+                                col,
+                                value: TokenValue::Number(val, if !unitstr.is_empty() { Some(unitstr) } else {None}),
+                            }),
+                            Err(e) => self.state = TokenizerState::Error(e.to_string())
+                        }
                     }
                 }
             } else if cur == '~' {
@@ -807,7 +876,7 @@ mod tests {
         let mut program = Tokenizer::new(String::from("123?,"));
         program.tokenize();
         assert_eq!(program.tokens, vec![]);
-        assert_eq!(program.state, TokenizerState::Error("The number contains unexpected characters".to_owned()));
+        assert_eq!(program.state, TokenizerState::Error("This number contains unexpected characters".to_owned()));
     }
 
     #[test]
