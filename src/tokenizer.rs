@@ -369,6 +369,7 @@ impl Tokenizer {
                     let mut num: Vec<char> = vec![];
                     let mut unit: Vec<char> = vec![];
                     let mut dotcount = 0;
+                    let mut has_exp = false;
                     let mut numcur = cur;
                     loop {
                         if numcur != '_' {
@@ -379,11 +380,18 @@ impl Tokenizer {
 
                         if is_eof(nextc) || is_wp(nextc) || is_operator(nextc) || is_num_separator(nextc) {
                             break;
+                        } else if !has_exp && (nextc == 'e') || (nextc == 'E') {
+                            has_exp = true;
+                            numcur = self.nextc();
                         } else if is_digit(nextc) || nextc == '_' {
                             numcur = self.nextc();
                         } else if nextc == '.' {
                             dotcount += 1;
-                            if dotcount > 1 {
+                            if has_exp {
+                                self.state = TokenizerState::Error("Fractional exponent in number".to_owned());
+                                error = true;
+                                break;
+                            } else if dotcount > 1 {
                                 self.state = TokenizerState::Error("Too many dots '.' in number".to_owned());
                                 error = true;
                                 break;
