@@ -24,6 +24,13 @@ impl Value {
             // _ => true,
         }
     }
+    pub fn is_nullish(&self) -> bool {
+        match self {
+            Value::Null => true,
+            Value::Void => true,
+            _ => false,
+        }
+    }
     pub fn num_equiv(&self) -> f64 {
         match self {
             Value::Null => 0.0,
@@ -46,6 +53,8 @@ pub enum Instruction {
     GetGlobal(usize),
     Jump(usize),
     JumpIfFalse(usize),
+    JumpIfTrue(usize),
+    JumpIfNotNullish(usize),
     Pop,
     Return,
     Negate,

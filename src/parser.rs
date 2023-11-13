@@ -37,6 +37,9 @@ pub enum BinaryOperator {
     Divide,
     Modulo,
     Power,
+    And,
+    Or,
+    NullishOr,
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
@@ -55,6 +58,9 @@ fn operator_precedence(op: BinaryOperator) -> usize {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence
 
     match op {
+        BinaryOperator::And => 4,
+        BinaryOperator::Or => 3,
+        BinaryOperator::NullishOr => 3,
         BinaryOperator::Equal => 8,
         BinaryOperator::NotEqual => 8,
         BinaryOperator::Less => 9,
@@ -465,6 +471,9 @@ impl Parser {
                     "*"    => Some(BinaryOperator::Multiply),
                     "/"    => Some(BinaryOperator::Divide),
                     "%"    => Some(BinaryOperator::Modulo),
+                    "&&"   => Some(BinaryOperator::And),
+                    "||"   => Some(BinaryOperator::Or),
+                    "??"   => Some(BinaryOperator::NullishOr),
                     "~|"   => Some(BinaryOperator::BitwiseOr),
                     "~&"   => Some(BinaryOperator::BitwiseAnd),
                     "~^"   => Some(BinaryOperator::BitwiseXor),
@@ -1951,7 +1960,7 @@ mod tests {
 
     #[test]
     fn test_parse_func_0() {
-        let mut parser = Parser::new(CONFIG, String::from("|| 42"));
+        let mut parser = Parser::new(CONFIG, String::from("| | 42"));
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(2, 42.0),
@@ -1960,9 +1969,31 @@ mod tests {
         assert_eq!(parser.state, ParserState::Done);
     }
 
+    //#[test]
+    //fn test_parse_func_0_b() {
+    //    let mut parser = Parser::new(CONFIG, String::from("|:| 42"));
+    //    parser.parse();
+    //    assert_eq!(parser.ast, vec![
+    //       AstNode::Number(2, 42.0),
+    //       AstNode::FunctionDef(0, vec![], 0)
+    //    ]);
+    //    assert_eq!(parser.state, ParserState::Done);
+    //}
+
+    //#[test]
+    //fn test_parse_func_0_c() {
+    //    let mut parser = Parser::new(CONFIG, String::from("<> 42"));
+    //    parser.parse();
+    //    assert_eq!(parser.ast, vec![
+    //       AstNode::Number(2, 42.0),
+    //       AstNode::FunctionDef(0, vec![], 0)
+    //    ]);
+    //    assert_eq!(parser.state, ParserState::Done);
+    //}
+
     #[test]
     fn test_parse_func_0_missing_body() {
-        let mut parser = Parser::new(CONFIG, String::from("||"));
+        let mut parser = Parser::new(CONFIG, String::from("| |"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -2505,7 +2536,7 @@ mod tests {
 
     #[test]
     fn test_parse_local_let() {
-        let mut parser = Parser::new(CONFIG, String::from("let a || let x 3 33 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let a | | let x 3 33 _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
         assert_eq!(parser.ast, vec![

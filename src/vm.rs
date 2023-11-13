@@ -313,6 +313,66 @@ impl Vm {
                     },
                 }
             },
+            AstNode::BinaryOperator(_, BinaryOperator::And, lexpr_node_idx, rexpr_node_idx) => {
+                if !self.compile_node(ast, *lexpr_node_idx) {
+                    println!("error compiling left condition of &&");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::JumpIfFalse(0));
+                let jmp_to_end_idx = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Pop);
+
+                if !self.compile_node(ast, *rexpr_node_idx) {
+                    println!("error compiling right condition of &&");
+                    return false;
+                }
+
+                let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfFalse(
+                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                ));
+            },
+            AstNode::BinaryOperator(_, BinaryOperator::Or, lexpr_node_idx, rexpr_node_idx) => {
+                if !self.compile_node(ast, *lexpr_node_idx) {
+                    println!("error compiling left condition of ||");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::JumpIfTrue(0));
+                let jmp_to_end_idx = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Pop);
+
+                if !self.compile_node(ast, *rexpr_node_idx) {
+                    println!("error compiling right condition of ||");
+                    return false;
+                }
+
+                let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfTrue(
+                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                ));
+            },
+            AstNode::BinaryOperator(_, BinaryOperator::NullishOr, lexpr_node_idx, rexpr_node_idx) => {
+                if !self.compile_node(ast, *lexpr_node_idx) {
+                    println!("error compiling left condition of ||");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::JumpIfNotNullish(0));
+                let jmp_to_end_idx = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Pop);
+
+                if !self.compile_node(ast, *rexpr_node_idx) {
+                    println!("error compiling right condition of ||");
+                    return false;
+                }
+
+                let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfNotNullish(
+                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                ));
+            },
             AstNode::BinaryOperator(_, op, lexpr_node_idx, rexpr_node_idx) => {
                 if !self.compile_node(ast, *lexpr_node_idx) {
                     println!("error compiling left arm of binary operator");
@@ -353,6 +413,9 @@ impl Vm {
                     BinaryOperator::I32Subtract    => { self.chunk.write(node_idx, Instruction::I32Subtract);},
                     BinaryOperator::I32Multiply    => { self.chunk.write(node_idx, Instruction::I32Multiply);},
                     BinaryOperator::I32Divide      => { self.chunk.write(node_idx, Instruction::I32Divide);},
+                    BinaryOperator::And            => { panic!("BinaryOperator::And case should have be handled elsewhere") },
+                    BinaryOperator::Or             => { panic!("BinaryOperator::Or case should have be handled elsewhere") },
+                    BinaryOperator::NullishOr      => { panic!("BinaryOperator::NullishOr case should have be handled elsewhere") },
                 }
             },
             _ => {
@@ -423,13 +486,20 @@ impl Vm {
                     }
                 },
                 Instruction::Jump(offset) => {
-                    // println!("jump:{}", offset);
                     self.ip += offset;
                 },
                 Instruction::JumpIfFalse(offset) => {
-                    let cond_value = self.top().is_truthy(); 
-                    if !cond_value {
-                        // println!("false, jump:{}", offset);
+                    if !self.top().is_truthy() {
+                        self.ip += offset;
+                    }
+                },
+                Instruction::JumpIfNotNullish(offset) => {
+                    if !self.top().is_nullish() {
+                        self.ip += offset;
+                    }
+                },
+                Instruction::JumpIfTrue(offset) => {
+                    if self.top().is_truthy() {
                         self.ip += offset;
                     }
                 },

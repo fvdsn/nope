@@ -97,11 +97,13 @@ fn is_unit(c:char) -> bool {
 fn is_operator(c:char) -> bool {
     return c == '+' || c == '*' || c == '/' || c == '=' 
         || c == '-' || c == '!' || c == '<' || c == '>'
-        || c == '%' || c == '~';
+        || c == '%' || c == '~' || c == '&' || c == '|'
+        || c == '?'; 
 }
 
-const OPERATORS: [&str; 26] = [
-     "==", "!=", "<=", ">=", "+-=", "!+-=", "**",
+const OPERATORS: [&str; 29] = [
+     "==", "!=", "<=", ">=", "+-=", "!+-=",
+     "**", "&&", "||", "??",
      "~<<", "~>>>", "~&", "~|", "~!", "~^", "~>>", 
      "~+", "~-", "~*", "~/",
      "<", ">", "+", "-", "*", "/", "!", "%", 
@@ -904,7 +906,7 @@ mod tests {
 
     #[test]
     fn test_parse_num_123xyz() {
-        let mut program = Tokenizer::new(String::from("123?,"));
+        let mut program = Tokenizer::new(String::from("123;"));
         program.tokenize();
         assert_eq!(program.tokens, vec![]);
         assert_eq!(program.state, TokenizerState::Error("This number contains unexpected characters".to_owned()));
