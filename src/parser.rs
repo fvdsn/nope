@@ -827,7 +827,7 @@ impl Parser {
 
         let target_idx = self.cur_ast_node_index();
 
-        let mut var_name:String = "".to_owned();
+        let var_name:String;
         let mut global_set = false;
         let target_node = self.cur_ast_node().clone();
         match target_node {
@@ -840,19 +840,16 @@ impl Parser {
             },
             _ => {
                 self.push_error(line, col, "ERROR: invalid set target".to_owned());
+                return;
             }
         };
-
-        if self.parsing_failed() {
-            return;
-        }
 
         match self.env.get_entry(&var_name.to_owned()) {
             Some(entry) => {
                 if entry.is_global != global_set {
                     self.push_error(line, col, "ERROR: globality type mismatch in set".to_owned());
                 } else if entry.is_const {
-                    self.push_error(line, col, "ERROR: cannot assign to a constant variable".to_owned());
+                    self.push_error(line, col, "ERROR: cannot assign to a constant variable (use 'var' instead of 'let')".to_owned());
                 }
                 // FIXME: typecheck the function / value and number of args
             },
@@ -967,7 +964,7 @@ impl Parser {
         self.ast.push(AstNode::IfElse(if_idx, cond_idx, expr_idx, expr2_idx));
     }
 
-    fn parse_let(&mut self, global_scope: bool, code_block: bool) {
+    fn parse_let(&mut self, is_const: bool, global_scope: bool, code_block: bool) {
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
             self.push_error(line, col, "ERROR: expected identifier after 'let'".to_owned());
@@ -982,6 +979,15 @@ impl Parser {
                 if is_reserved_keyword(var_name) {
                     self.push_error(line, col, "ERROR: cannot redefine reserved keyword".to_owned());
                 } else {
+
+                    if let Some(entry) =  self.env.get_entry(&var_name.to_owned()) {
+                        if entry.is_const != is_const {
+                            self.push_error(line, col, "ERROR: variable already declared with a different qualifier (var/let)".to_owned());
+                            return;
+                        }
+                        // FIXME: typecheck the function / value and number of args
+                    }
+
                     if self.peek_closing_element() {
                         let (vline, vcol) = self.peek_line_col();
                         self.push_info(line, col, "this variable definition doesn't have a value".to_owned());
@@ -1012,7 +1018,7 @@ impl Parser {
                             );
                         }
                         _ => {
-                            self.env.push_value_entry(var_name.clone(), global_scope, false);
+                            self.env.push_value_entry(var_name.clone(), global_scope, is_const);
                         }
                     };
 
@@ -1362,7 +1368,9 @@ impl Parser {
                 } else if name == "void" || name == "_" || name == "end" {
                     self.ast.push(AstNode::Void(self.index));
                 } else if name == "let" {
-                    self.parse_let(global_scope, code_block);
+                    self.parse_let(true, global_scope, code_block);
+                } else if name == "var" {
+                    self.parse_let(false, global_scope, code_block);
                 } else if name == "set" {
                     self.parse_set();
                 } else if name == "if" {
@@ -1832,8 +1840,25 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_let_defines_var() {
+    fn test_parse_let_defines_const() {
         let mut parser = Parser::new(CONFIG, String::from("let x 3 x"));
+        let envsize = parser.env.size();
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(2, 3.0),
+            AstNode::GlobalValueReference(3, "x".to_owned()),
+            AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
+        ]);
+        let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
+        assert_eq!(entry.is_global, true);
+        assert_eq!(entry.is_const, true);
+        assert_eq!(envsize+1, parser.env.size());
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_var_defines_var() {
+        let mut parser = Parser::new(CONFIG, String::from("var x 3 x"));
         let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
@@ -1882,10 +1907,10 @@ mod tests {
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
         assert_eq!(entry.is_global, true);
-        assert_eq!(entry.is_const, false);
+        assert_eq!(entry.is_const, true);
         let entry2 = parser.env.get_entry(&"y".to_owned()).unwrap();
         assert_eq!(entry2.is_global, true);
-        assert_eq!(entry2.is_const, false);
+        assert_eq!(entry2.is_const, true);
         assert_eq!(envsize+2, parser.env.size());
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -1897,7 +1922,7 @@ mod tests {
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
         assert_eq!(entry.is_global, true);
-        assert_eq!(entry.is_const, false);
+        assert_eq!(entry.is_const, true);
         assert_eq!(None, parser.env.get_entry(&"y".to_owned()));
         assert_eq!(envsize+1, parser.env.size());
         assert_eq!(parser.state, ParserState::Done);
@@ -1910,7 +1935,7 @@ mod tests {
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
         assert_eq!(entry.is_global, true);
-        assert_eq!(entry.is_const, false);
+        assert_eq!(entry.is_const, true);
         assert_eq!(None, parser.env.get_entry(&"y".to_owned()));
         assert_eq!(None, parser.env.get_entry(&"z".to_owned()));
         assert_eq!(envsize+1, parser.env.size());
