@@ -221,7 +221,32 @@ impl Vm {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
                 self.chunk.write_constant(node_idx, Value::String(str_ref));
             },
+            AstNode::CodeBlock(_, expression_idx_list) => {
+                for idx in expression_idx_list {
+                    if !self.compile_node(ast, *idx) {
+                        println!("error compiling code block");
+                        return false;
+                    }
+                    if idx != expression_idx_list.last().unwrap() {
+                        self.chunk.write(node_idx, Instruction::Pop);
+                    }
+
+                }
+            },
             AstNode::GlobalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
+                let name_ref = self.gc.intern(name.to_owned());
+                let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
+                if !self.compile_node(ast, *value_expr_node_idx) {
+                    println!("error compiling expression value for global variable {}", name);
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::DefineGlobal(name_cst_idx));
+                if !self.compile_node(ast, *next_expr_node_idx) {
+                    println!("error compile continuation expression for global variable {}", name);
+                    return false;
+                }
+            },
+            AstNode::LocalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
                 let name_ref = self.gc.intern(name.to_owned());
                 let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
                 if !self.compile_node(ast, *value_expr_node_idx) {
@@ -248,6 +273,11 @@ impl Vm {
                 self.chunk.write(node_idx, Instruction::SetGlobal(name_cst_idx));
             },
             AstNode::GlobalValueReference(_, var_name) => {
+                let name_ref = self.gc.intern(var_name.to_owned());
+                let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
+                self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
+            },
+            AstNode::LocalValueReference(_, var_name) => {
                 let name_ref = self.gc.intern(var_name.to_owned());
                 let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
                 self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
