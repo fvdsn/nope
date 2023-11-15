@@ -201,7 +201,12 @@ impl Stdlib {
 
     pub fn add_definitions_to_env(&self, env: &mut Env) {
         for func in self.functions.iter() {
-            env.push_func_entry(func.name.to_owned(), func.args.clone());
+            env.push_func_entry(
+                func.name.to_owned(),
+                true,
+                true,
+                func.args.clone(),
+            );
         }
     }
 

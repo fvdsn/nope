@@ -112,10 +112,11 @@ pub enum AstNode {
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
     GlobalLet(usize, String, usize, usize),
-    Set(usize, usize, usize), // set $target $expr
+    GlobalSet(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
-    ValueReference(usize, String),    // reference to the variable 'String' that contains a value
+    GlobalValueReference(usize, String),    // reference to the variable 'String' that contains a value
+    LocalValueReference(usize, String),    // reference to the variable 'String' that contains a value
 FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
     FunctionDef(usize, Vec<FunctionArg>, usize), // last usize is ref to function expression 
     StaticKeyAccess(usize, String, usize),  // string is name of key, last usize is expression of
@@ -222,7 +223,10 @@ impl Parser {
             AstNode::Void(_) => {
                 println!("{}_", " ".repeat(original_indent));
             },
-            AstNode::ValueReference(_, str) => {
+            AstNode::GlobalValueReference(_, str) => {
+                println!("{}{}", " ".repeat(original_indent), str);
+            },
+            AstNode::LocalValueReference(_, str) => {
                 println!("{}{}", " ".repeat(original_indent), str);
             },
             AstNode::Array(_, values) => {
@@ -262,7 +266,7 @@ impl Parser {
                 self._pretty_print_ast(*expr_1, indent + 2, false);
                 self._pretty_print_ast(*expr_2, indent, false);
             },
-            AstNode::Set(_, target, expr) => {
+            AstNode::GlobalSet(_, target, expr) => {
                 println!("{}set", " ".repeat(original_indent));
                 self._pretty_print_ast(*target, indent + 2, false);
                 self._pretty_print_ast(*expr, indent + 2, false);
@@ -579,6 +583,10 @@ impl Parser {
         }
     }
 
+    pub fn get_ast_node(&self, index: usize) -> AstNode{
+        return self.ast[index].clone();
+    }
+
     pub fn parsing_failed(&self) -> bool {
         return self.state == ParserState::Error || self.state == ParserState::Incomplete;
     }
@@ -674,15 +682,15 @@ impl Parser {
         // if we have a name for the function, push a reference to it in the environment
         // to allow recursion
         if let Some(name) = func_name {
-            self.env.push_func_entry(name.to_string(), func_args.clone());
+            self.env.push_func_entry(name.to_string(), false, false, func_args.clone());
         }
 
         // create an environment entry for each function argument
         for arg in &func_args {
             if arg.is_func {
-                self.env.push_arg_func_entry(arg.name.clone(), arg.func_arity);
+                self.env.push_arg_func_entry(arg.name.clone(), false, false, arg.func_arity);
             } else {
-                self.env.push_value_entry(arg.name.clone());
+                self.env.push_value_entry(arg.name.clone(), false, false);
             }
         }
 
@@ -818,18 +826,67 @@ impl Parser {
         }
 
         let target_idx = self.cur_ast_node_index();
+
+        let mut var_name:String = "".to_owned();
+        let mut global_set = false;
+        let target_node = self.cur_ast_node().clone();
+        match target_node {
+            AstNode::GlobalValueReference(_, name) => {
+                var_name = name;
+                global_set = true;
+            },
+            AstNode::LocalValueReference(_, name) => {
+                var_name = name;
+            },
+            _ => {
+                self.push_error(line, col, "ERROR: invalid set target".to_owned());
+            }
+        };
+
+        if self.parsing_failed() {
+            return;
+        }
+
+        match self.env.get_entry(&var_name.to_owned()) {
+            Some(entry) => {
+                if entry.is_global != global_set {
+                    self.push_error(line, col, "ERROR: globality type mismatch in set".to_owned());
+                } else if entry.is_const {
+                    self.push_error(line, col, "ERROR: cannot assign to a constant variable".to_owned());
+                }
+                // FIXME: typecheck the function / value and number of args
+            },
+            _ => {
+                self.push_error(line, col, "ERROR: undeclared variable".to_owned());
+            }
+        };
+
+        if self.parsing_failed() {
+            return;
+        }
+
+        if self.peek_equal() { // we accept an optional '='; "let x = 42" or "let x 42"
+            self.nextt();
+        }
+
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_info(line, col, "this set is missing an expression".to_owned());
             self.push_error(eline, ecol, "ERROR: expected expression for 'set'".to_owned());
             return;
         }
+
         self.parse_expression(false, false, None);
         if self.parsing_failed() {
             return;
         }
         let expr_idx = self.cur_ast_node_index();
-        self.ast.push(AstNode::Set(set_idx, target_idx, expr_idx));
+        
+        if global_set {
+            self.ast.push(AstNode::GlobalSet(set_idx, target_idx, expr_idx));
+        } else {
+            panic!("LocalSet not implemented"); // FIXME
+        }
     }
 
     fn parse_do(&mut self) {
@@ -947,10 +1004,15 @@ impl Parser {
 
                     match value_node {
                         AstNode::FunctionDef(_, args,_) => {
-                            self.env.push_func_entry(var_name.clone(), args.clone());
+                            self.env.push_func_entry(
+                                var_name.clone(),
+                                global_scope,
+                                true,
+                                args.clone(),
+                            );
                         }
                         _ => {
-                            self.env.push_value_entry(var_name.clone());
+                            self.env.push_value_entry(var_name.clone(), global_scope, false);
                         }
                     };
 
@@ -1002,7 +1064,11 @@ impl Parser {
                         self.push_error(line, col, "ERROR: the referenced variable is not a function".to_owned());
                         return;
                     }
-                    self.ast.push(AstNode::ValueReference(self.index, name));
+                    if env_entry.is_global {
+                        self.ast.push(AstNode::GlobalValueReference(self.index, name));
+                    } else {
+                        self.ast.push(AstNode::LocalValueReference(self.index, name));
+                    }
                 } else {
                     let mut arg_node_indexes: Vec<usize> = vec![];
                     for (arg_index, arg) in env_entry.func_args.iter().enumerate() {
@@ -1768,12 +1834,17 @@ mod tests {
     #[test]
     fn test_parse_let_defines_var() {
         let mut parser = Parser::new(CONFIG, String::from("let x 3 x"));
+        let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
-            AstNode::ValueReference(3, "x".to_owned()),
+            AstNode::GlobalValueReference(3, "x".to_owned()),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
+        let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
+        assert_eq!(entry.is_global, true);
+        assert_eq!(entry.is_const, false);
+        assert_eq!(envsize+1, parser.env.size());
         assert_eq!(parser.state, ParserState::Done);
     }
 
@@ -1783,9 +1854,66 @@ mod tests {
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 3.0),
-            AstNode::ValueReference(4, "x".to_owned()),
+            AstNode::GlobalValueReference(4, "x".to_owned()),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_let_defines_local_var() {
+        let mut parser = Parser::new(CONFIG, String::from("(let x 3 x)"));
+        let envsize = parser.env.size();
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(3, 3.0),
+            AstNode::LocalValueReference(4, "x".to_owned()),
+            AstNode::Let(1, "x".to_owned(), 0, 1)
+        ]);
+        assert_eq!(None, parser.env.get_entry(&"x".to_owned()));
+        assert_eq!(envsize, parser.env.size());
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_let_double_global() {
+        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 _"));
+        let envsize = parser.env.size();
+        parser.parse();
+        let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
+        assert_eq!(entry.is_global, true);
+        assert_eq!(entry.is_const, false);
+        let entry2 = parser.env.get_entry(&"y".to_owned()).unwrap();
+        assert_eq!(entry2.is_global, true);
+        assert_eq!(entry2.is_const, false);
+        assert_eq!(envsize+2, parser.env.size());
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_let_global_and_local() {
+        let mut parser = Parser::new(CONFIG, String::from("let x let y 3 _ _"));
+        let envsize = parser.env.size();
+        parser.parse();
+        let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
+        assert_eq!(entry.is_global, true);
+        assert_eq!(entry.is_const, false);
+        assert_eq!(None, parser.env.get_entry(&"y".to_owned()));
+        assert_eq!(envsize+1, parser.env.size());
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_let_global_and_local_if() {
+        let mut parser = Parser::new(CONFIG, String::from("let x = if true let y 3 _ else let z 4 _"));
+        let envsize = parser.env.size();
+        parser.parse();
+        let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
+        assert_eq!(entry.is_global, true);
+        assert_eq!(entry.is_const, false);
+        assert_eq!(None, parser.env.get_entry(&"y".to_owned()));
+        assert_eq!(None, parser.env.get_entry(&"z".to_owned()));
+        assert_eq!(envsize+1, parser.env.size());
         assert_eq!(parser.state, ParserState::Done);
     }
 
@@ -1854,8 +1982,8 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
             AstNode::Number(5, 4.0),
-            AstNode::ValueReference(7, "x".to_owned()),
-            AstNode::ValueReference(8, "y".to_owned()),
+            AstNode::GlobalValueReference(7, "x".to_owned()),
+            AstNode::GlobalValueReference(8, "y".to_owned()),
             AstNode::Array(9, vec![2, 3]),
             AstNode::GlobalLet(3, "y".to_owned(), 1, 4),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 5)
@@ -2003,7 +2131,7 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("|a| a"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-           AstNode::ValueReference(3, "a".to_owned()),
+           AstNode::LocalValueReference(3, "a".to_owned()),
            AstNode::FunctionDef(0, vec![
                 FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 }
            ], 0)
@@ -2043,8 +2171,8 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("|a b| [a b]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-           AstNode::ValueReference(5, "a".to_owned()),
-           AstNode::ValueReference(6, "b".to_owned()),
+           AstNode::LocalValueReference(5, "a".to_owned()),
+           AstNode::LocalValueReference(6, "b".to_owned()),
            AstNode::Array(7, vec![0, 1]),
            AstNode::FunctionDef(0, vec![
                 FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },
@@ -2325,7 +2453,7 @@ mod tests {
         parser.parse();
         assert_eq!(parser.ast, vec![
            AstNode::Number(2, 3.14),
-           AstNode::ValueReference(4, "pi".to_string()),
+           AstNode::GlobalValueReference(4, "pi".to_string()),
            AstNode::Number(6, 12.0),
            AstNode::DynamicKeyAccess(3, 1, 2),
            AstNode::GlobalLet(0, "pi".to_string(), 0, 3)
@@ -2514,7 +2642,7 @@ mod tests {
             AstNode::Number(2, 3.0),
             AstNode::Void(3),
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
-            AstNode::ValueReference(5, "a".to_owned()),
+            AstNode::GlobalValueReference(5, "a".to_owned()),
             AstNode::FunctionCall(5, "print".to_owned(), vec![3]),
             AstNode::CodeBlock(0, vec![2, 4])
         ]);

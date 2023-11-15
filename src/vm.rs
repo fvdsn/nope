@@ -172,7 +172,7 @@ impl Vm {
             println!("compile...");
         }
 
-        if !self.compile(&parser.ast) {
+        if !self.compile(&parser) {
             println!("compilation error");
             self.chunk.pretty_print();
             return InterpretResult::CompileError
@@ -203,8 +203,8 @@ impl Vm {
         return res;
     }
 
-    fn compile_node(&mut self, ast: &Vec<AstNode>, node_idx: usize) -> bool {
-        match &ast[node_idx] {
+    fn compile_node(&mut self, ast: &Parser, node_idx: usize) -> bool {
+        match &ast.ast[node_idx] {
             AstNode::Number(_, num) => {
                 self.chunk.write_constant(node_idx, Value::Num(*num));
             },
@@ -234,7 +234,20 @@ impl Vm {
                     return false;
                 }
             },
-            AstNode::ValueReference(_, var_name) => {
+            AstNode::GlobalSet(_, value_target_idx, value_expr_node_idx) => {
+                let name = match ast.get_ast_node(*value_target_idx) {
+                    AstNode::GlobalValueReference(_, name) => name,
+                    _ => panic!("attempting to global set a non global var"),
+                };
+                let name_ref = self.gc.intern(name.to_owned());
+                let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
+                if !self.compile_node(ast, *value_expr_node_idx) {
+                    println!("error compiling expression value for global variable {}", name);
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::SetGlobal(name_cst_idx));
+            },
+            AstNode::GlobalValueReference(_, var_name) => {
                 let name_ref = self.gc.intern(var_name.to_owned());
                 let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
                 self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
@@ -425,9 +438,10 @@ impl Vm {
         return true;
     }
 
-    pub fn compile(&mut self, ast: &Vec<AstNode>) -> bool {
+    pub fn compile(&mut self, parser:&Parser) -> bool {
+        let ast: &Vec<AstNode> = &parser.ast;
         if !ast.is_empty() {
-            if !self.compile_node(ast, ast.len() - 1) {
+            if !self.compile_node(parser, ast.len() - 1) {
                 return false;
             }
             if self.config.echo_result && !self.chunk.is_last_instruction_echo_or_print() {
@@ -484,6 +498,12 @@ impl Vm {
                             panic!("Undefined global {}", global_name);
                         }
                     }
+                },
+                Instruction::SetGlobal(cst_idx) => {
+                    let global_name = self.chunk.read_constant_string(cst_idx);
+                    let value = self.pop();
+                    self.globals.insert(global_name, value);
+                    self.push(value);
                 },
                 Instruction::Jump(offset) => {
                     self.ip += offset;

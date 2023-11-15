@@ -51,6 +51,7 @@ pub enum Instruction {
     ConstantNum(f64),
     DefineGlobal(usize),
     GetGlobal(usize),
+    SetGlobal(usize),
     Jump(usize),
     JumpIfFalse(usize),
     JumpIfTrue(usize),

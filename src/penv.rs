@@ -9,6 +9,8 @@ pub struct FunctionArg {
 pub struct EnvEntry {
     pub name: String,
     pub is_func: bool,
+    pub is_global: bool,
+    pub is_const: bool,
     pub func_args: Vec<FunctionArg>,
 }
 
@@ -31,19 +33,44 @@ impl Env {
         }
     }
 
-    pub fn push_value_entry(&mut self, name: String) {
-        self.entries.push(EnvEntry { name, is_func:false, func_args:vec![] });
+    pub fn push_value_entry(&mut self, name: String, is_global: bool, is_const: bool) {
+        self.entries.push(EnvEntry {
+            name,
+            is_global,
+            is_const,
+            is_func:false,
+            func_args:vec![],
+        });
     }
 
-    pub fn push_func_entry(&mut self, name: String, args: Vec<FunctionArg>) {
+    pub fn push_func_entry(
+        &mut self,
+        name: String,
+        is_global: bool,
+        is_const: bool,
+        args: Vec<FunctionArg>,
+    ) {
         if name == "_" {    // _ must keep having the void value
-            self.entries.push(EnvEntry { name, is_func:false, func_args:vec![] });
+            self.entries.push(EnvEntry {
+                name,
+                is_global: true,
+                is_const: true,
+                is_func: false,
+                func_args:vec![],
+            });
         } else {
-            self.entries.push(EnvEntry { name, is_func:true, func_args:args });
+            self.entries.push(
+                EnvEntry {
+                    name,
+                    is_global,
+                    is_const,
+                    is_func:true,
+                    func_args:args,
+                });
         }
     }
 
-    pub fn push_arg_func_entry(&mut self, name: String, argc:usize) {
+    pub fn push_arg_func_entry(&mut self, name: String, is_global: bool, is_const: bool, argc:usize) {
         let mut func_args: Vec<FunctionArg> = vec![];
         for i in 0..argc {
             func_args.push(FunctionArg {
@@ -52,7 +79,13 @@ impl Env {
                 func_arity: 0,
             });
         }
-        self.entries.push(EnvEntry { name, is_func:true, func_args });
+        self.entries.push(EnvEntry {
+            name,
+            is_global,
+            is_const,
+            is_func:true,
+            func_args,
+        });
     }
 
     pub fn pop_entry(&mut self) {
@@ -77,6 +110,11 @@ impl Env {
             }
         }
         return None;
+    }
+
+    #[allow(dead_code)]
+    pub fn size(&self) -> usize {
+        self.entries.len()
     }
 }
 
