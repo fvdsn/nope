@@ -117,7 +117,7 @@ pub enum AstNode {
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
     GlobalValueReference(usize, String),    // reference to the variable 'String' that contains a value
     LocalValueReference(usize, String),    // reference to the variable 'String' that contains a value
-FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
+    FunctionCall(usize, String, Vec<usize>),    // function call to function named 'String'
     FunctionDef(usize, Vec<FunctionArg>, usize), // last usize is ref to function expression 
     StaticKeyAccess(usize, String, usize),  // string is name of key, last usize is expression of
                                             // which we access the key from
@@ -1055,6 +1055,7 @@ impl Parser {
         let (line, col) = self.cur_line_col();
         let mut uses_commas = false;
         let mut explicit_func_call = false;
+        let func_token_index = self.index;
 
         if self.peek_nleftp() { // function call is of the form 'foo(...)' instead of 'foo ...'
             explicit_func_call = true;
@@ -1153,7 +1154,7 @@ impl Parser {
 
                         arg_node_indexes.push(self.cur_ast_node_index()); 
                     }
-                    self.ast.push(AstNode::FunctionCall(self.index, name, arg_node_indexes));
+                    self.ast.push(AstNode::FunctionCall(func_token_index, name, arg_node_indexes));
                     
                     if explicit_func_call {
                         if self.peek_rightp() {
@@ -1390,7 +1391,7 @@ impl Parser {
                     return;
                 }
                 self.parse_code_block(false);
-                // self.parse_expression(false, false, var_name);
+
                 if self.parsing_failed() {
                     return;
                 }
@@ -1429,17 +1430,37 @@ impl Parser {
 
         let cur_block_var_count = self.block_var_count;
 
+        let mut prev_line = 0;
+        let mut prev_col = 0;
+        let mut first_line = true;
+
         loop {
             if self.peek_closing_element() {
                 break;
             }
 
+            let (line, col) = self.peek_line_col();
             self.parse_expression(global_scope, true, None);
             if self.parsing_failed() {
                 return;
             }
 
-            expressions_indexes.push(self.cur_ast_node_index())
+            if !first_line {
+                if line == prev_line {
+                    self.push_error(line, col, "ERROR: cannot have two expressions on the same line".to_owned());
+                    return;
+                } else if col != prev_col {
+                    self.push_error(line, col, "ERROR: must have the same indentation as previous expression in the block".to_owned());
+                    return;
+                }
+            }
+
+            expressions_indexes.push(self.cur_ast_node_index());
+
+            first_line = false;
+            prev_line = line;
+            prev_col = col;
+
         }
 
         if !global_scope {
@@ -2088,7 +2109,7 @@ mod tests {
         let mut parser = Parser::new(CONFIG, String::from("random()"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::FunctionCall(1, "random".to_owned(), vec![]) //FIXME index ?
+            AstNode::FunctionCall(0, "random".to_owned(), vec![]) //FIXME index ?
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2100,7 +2121,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 1.0),
             AstNode::Number(4, 2.0),
-            AstNode::FunctionCall(4, "add".to_owned(), vec![0, 1])
+            AstNode::FunctionCall(0, "add".to_owned(), vec![0, 1])
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2250,7 +2271,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
            AstNode::Number(7, 3.0),
            AstNode::Number(8, 4.0),
-           AstNode::FunctionCall(8, "a".to_owned(), vec![0, 1]), 
+           AstNode::FunctionCall(6, "a".to_owned(), vec![0, 1]), 
            AstNode::FunctionDef(1, vec![FunctionArg { name: "a".to_owned(), is_func: true, func_arity: 2 }], 2)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2400,7 +2421,7 @@ mod tests {
         assert_eq!(parser.ast, vec![
            AstNode::Number(3, 1.0),
            AstNode::Number(4, 2.0),
-           AstNode::FunctionCall(4, "add".to_string(), vec![0, 1]),
+           AstNode::FunctionCall(2, "add".to_string(), vec![0, 1]),
            AstNode::StaticKeyAccess(0, "foo".to_string(), 2)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2647,13 +2668,13 @@ mod tests {
 
     #[test]
     fn test_parse_code_block() {
-        let mut parser = Parser::new(CONFIG, String::from("print 3.14 print 4.92"));
+        let mut parser = Parser::new(CONFIG, String::from("print 3.14\nprint 4.92"));
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.14),
-            AstNode::FunctionCall(1, "print".to_owned(), vec![0]),
+            AstNode::FunctionCall(0, "print".to_owned(), vec![0]),
             AstNode::Number(3, 4.92),
-            AstNode::FunctionCall(3, "print".to_owned(), vec![2]),
+            AstNode::FunctionCall(2, "print".to_owned(), vec![2]),
             AstNode::CodeBlock(0, vec![1, 3])
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2661,7 +2682,7 @@ mod tests {
 
     #[test]
     fn test_parse_code_block_env_carry_over() {
-        let mut parser = Parser::new(CONFIG, String::from("let a 3 _ print a"));
+        let mut parser = Parser::new(CONFIG, String::from("let a 3 _\nprint a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
         assert_eq!(parser.ast, vec![
@@ -2669,14 +2690,14 @@ mod tests {
             AstNode::Void(3),
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
             AstNode::GlobalValueReference(5, "a".to_owned()),
-            AstNode::FunctionCall(5, "print".to_owned(), vec![3]),
+            AstNode::FunctionCall(4, "print".to_owned(), vec![3]),
             AstNode::CodeBlock(0, vec![2, 4])
         ]);
     }
 
     #[test]
     fn test_parse_code_block_env_carry_over2() {
-        let mut parser = Parser::new(CONFIG, String::from("let a 3 let b 4 _ add a b"));
+        let mut parser = Parser::new(CONFIG, String::from("let a 3 let b 4 _\nadd a b"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2815,9 +2836,9 @@ mod tests {
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.0),
-            AstNode::FunctionCall(1, "neg".to_owned(), vec![0]),
+            AstNode::FunctionCall(0, "neg".to_owned(), vec![0]),
             AstNode::Number(4, 5.0),
-            AstNode::FunctionCall(4, "neg".to_owned(), vec![2]),
+            AstNode::FunctionCall(3, "neg".to_owned(), vec![2]),
             AstNode::BinaryOperator(2, BinaryOperator::Add, 1, 3)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2830,9 +2851,9 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(2, 3.0),
             AstNode::Number(5, 5.0),
-            AstNode::FunctionCall(5, "not".to_owned(), vec![1]),
+            AstNode::FunctionCall(4, "not".to_owned(), vec![1]),
             AstNode::BinaryOperator(3, BinaryOperator::Add, 0, 2),
-            AstNode::FunctionCall(5, "neg".to_owned(), vec![3])
+            AstNode::FunctionCall(0, "neg".to_owned(), vec![3])
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
