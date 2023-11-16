@@ -4,6 +4,8 @@ use crate::consts::EPSILON;
 pub enum TokenValue {
     LeftSqBrkt,
     RightSqBrkt,
+    LeftBrkt,
+    RightBrkt,
     LeftP,
     NameLeftP,
     RightP,
@@ -267,6 +269,10 @@ impl Tokenizer {
                 self.push_token(TokenValue::LeftSqBrkt);
             } else if cur == ']' {
                 self.push_token(TokenValue::RightSqBrkt);
+            } else if cur == '{' {
+                self.push_token(TokenValue::LeftBrkt);
+            } else if cur == '}' {
+                self.push_token(TokenValue::RightBrkt);
             } else if cur == '(' {
                 self.push_token(TokenValue::LeftP);
             } else if cur == ')' {

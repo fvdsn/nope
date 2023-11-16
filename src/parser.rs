@@ -439,6 +439,9 @@ impl Parser {
             Token {value: TokenValue::RightP, ..} => {
                 return true;
             },
+            Token {value: TokenValue::RightBrkt, ..} => {
+                return true;
+            },
             Token {value: TokenValue::RightSqBrkt, ..} => {
                 return true;
             },
@@ -505,6 +508,11 @@ impl Parser {
     fn peek_rightp(&self) -> bool {
         let token = &self.peekt();
         return matches!(token.value, TokenValue::RightP);
+    }
+
+    fn peek_rightbrkt(&self) -> bool {
+        let token = &self.peekt();
+        return matches!(token.value, TokenValue::RightBrkt);
     }
 
     fn peek_swp(&self) -> bool {
@@ -1403,6 +1411,31 @@ impl Parser {
                     self.push_info(pline, pcol, "unclosed '('".to_owned());
                     let (line, col) = self.peek_line_col();
                     self.push_error(line, col, "ERROR: expected closing ')'".to_owned());
+                } else {
+                    self.nextt();
+                }
+            },
+
+            Token {value: TokenValue::LeftBrkt, ..} => {
+                let (pline, pcol) = self.cur_line_col();
+                if self.peek_rightbrkt() {
+                    self.ast.push(AstNode::Void(self.index));
+                    self.nextt();
+                    return;
+                }
+                self.parse_code_block(false);
+
+                if self.parsing_failed() {
+                    return;
+                }
+                if self.peek_eof() {
+                    self.push_info(pline, pcol, "unclosed '{'".to_owned());
+                    let (line, col) = self.peek_line_col();
+                    self.push_incomplete(line, col, "ERROR: expected closing '}'".to_owned());
+                } else if !self.peek_rightbrkt() {
+                    self.push_info(pline, pcol, "unclosed '}'".to_owned());
+                    let (line, col) = self.peek_line_col();
+                    self.push_error(line, col, "ERROR: expected closing '}'".to_owned());
                 } else {
                     self.nextt();
                 }
