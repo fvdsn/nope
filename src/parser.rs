@@ -97,7 +97,6 @@ fn operator_associates_right(op: BinaryOperator) -> bool {
     }
 }
 
-
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
     // first usize is index of related token in tokens array
@@ -112,6 +111,7 @@ pub enum AstNode {
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
     GlobalLet(usize, String, usize, usize),
+    BlockLet(usize, String, usize, usize),
     GlobalSet(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
@@ -125,7 +125,8 @@ pub enum AstNode {
                                             // last usize is the expression that gives the array,
     UnaryOperator(usize, UnaryOperator, usize), 
     BinaryOperator(usize, BinaryOperator, usize, usize), 
-    CodeBlock(usize, Vec<usize>),
+    CodeBlock(usize, Vec<usize>, Vec<String>), //Vec<usize> is the expressions, Vec<String> is 
+                                               //the block level variables
 }
 
 #[derive(PartialEq, Debug)]
@@ -236,7 +237,7 @@ impl Parser {
                 }
                 println!("{}]", " ".repeat(indent));
             },
-            AstNode::CodeBlock(_, expressions) => {
+            AstNode::CodeBlock(_, expressions, _) => {
                 for expression in expressions {
                     self._pretty_print_ast(*expression, indent, false);
                 }
@@ -252,6 +253,11 @@ impl Parser {
             },
             AstNode::GlobalLet(_, name, val_index, expr_index) => {
                 print!("{}let (global) {} ", " ".repeat(original_indent), name);
+                self._pretty_print_ast(*val_index, indent + 2, true);
+                self._pretty_print_ast(*expr_index, indent, false);
+            },
+            AstNode::BlockLet(_, name, val_index, expr_index) => {
+                print!("{}let (block) {} ", " ".repeat(original_indent), name);
                 self._pretty_print_ast(*val_index, indent + 2, true);
                 self._pretty_print_ast(*expr_index, indent, false);
             },
@@ -1048,6 +1054,8 @@ impl Parser {
                     let expr_idx = self.cur_ast_node_index();
                     if global_scope {
                         self.ast.push(AstNode::GlobalLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
+                    } else if code_block {
+                        self.ast.push(AstNode::BlockLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
                     } else {
                         self.ast.push(AstNode::LocalLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
                     }
@@ -1459,6 +1467,7 @@ impl Parser {
 
     fn parse_code_block(&mut self, global_scope: bool) {
         let mut expressions_indexes:Vec<usize> = vec![];
+        let mut block_vars:Vec<String> = vec![];
         let code_block_token_index = self.index;
 
         let cur_block_var_count = self.block_var_count;
@@ -1490,6 +1499,10 @@ impl Parser {
 
             expressions_indexes.push(self.cur_ast_node_index());
 
+            if let AstNode::BlockLet(_, var_name, _, _) = self.cur_ast_node() {
+                block_vars.push(var_name.to_owned());
+            }
+
             first_line = false;
             prev_line = line;
             prev_col = col;
@@ -1503,9 +1516,8 @@ impl Parser {
             self.block_var_count = cur_block_var_count;
         }
 
-
-        if expressions_indexes.len() >= 2 {
-            self.ast.push(AstNode::CodeBlock(code_block_token_index, expressions_indexes));
+        if expressions_indexes.len() >= 2 || block_vars.len() >= 1 {
+            self.ast.push(AstNode::CodeBlock(code_block_token_index, expressions_indexes, block_vars));
         }
     }
 
@@ -1948,7 +1960,8 @@ mod tests {
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 3.0),
             AstNode::LocalValueReference(4, "x".to_owned()),
-            AstNode::LocalLet(1, "x".to_owned(), 0, 1)
+            AstNode::BlockLet(1, "x".to_owned(), 0, 1),
+            AstNode::CodeBlock(0, vec![2], vec!["x".to_owned()])
         ]);
         assert_eq!(None, parser.env.get_entry(&"x".to_owned()));
         assert_eq!(envsize, parser.env.size());
@@ -2708,7 +2721,7 @@ mod tests {
             AstNode::FunctionCall(0, "print".to_owned(), vec![0]),
             AstNode::Number(3, 4.92),
             AstNode::FunctionCall(2, "print".to_owned(), vec![2]),
-            AstNode::CodeBlock(0, vec![1, 3])
+            AstNode::CodeBlock(0, vec![1, 3], vec![])
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2724,7 +2737,7 @@ mod tests {
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
             AstNode::GlobalValueReference(5, "a".to_owned()),
             AstNode::FunctionCall(4, "print".to_owned(), vec![3]),
-            AstNode::CodeBlock(0, vec![2, 4])
+            AstNode::CodeBlock(0, vec![2, 4], vec![])
         ]);
     }
 

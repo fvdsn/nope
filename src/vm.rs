@@ -23,6 +23,7 @@ use crate::{
         Chunk,
         Instruction,
         GlobalsTable,
+        // LocalsTable,
     },
     gc::{
         Gc,
@@ -45,6 +46,7 @@ pub struct Vm {
     gc: Gc,
     stdlib: Stdlib,
     globals: GlobalsTable,
+    // locals: LocalsTable,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -57,6 +59,7 @@ impl Vm {
             parsers: vec![],
             gc: Gc::new(),
             globals: GlobalsTable::new(),
+            // locals: LocalsTable::new(),
             stdlib: Stdlib::new(),
             config,
             chunk: Chunk::new(),
@@ -221,7 +224,7 @@ impl Vm {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
                 self.chunk.write_constant(node_idx, Value::String(str_ref));
             },
-            AstNode::CodeBlock(_, expression_idx_list) => {
+            AstNode::CodeBlock(_, expression_idx_list, _) => {
                 for idx in expression_idx_list {
                     if !self.compile_node(ast, *idx) {
                         println!("error compiling code block");

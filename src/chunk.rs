@@ -44,6 +44,52 @@ impl Value {
 
 pub type GlobalsTable = HashMap<GcRef<String>, Value>;
 
+#[derive(PartialEq, Debug, Clone)]
+pub struct Local {
+    name: String,
+    depth: usize,
+}
+
+/*
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct LocalsTable {
+    locals: Vec<Local>,
+}
+
+impl LocalsTable {
+    pub fn new() -> LocalsTable {
+        return LocalsTable {
+            locals: vec![],
+        };
+    }
+    pub fn add_local(&mut self, name: String, depth: usize) {
+        self.locals.push(Local {depth, name: name.to_owned()});
+    }
+    pub fn pop(&mut self) {
+        if self.locals.is_empty() {
+            panic!("empty locals stash (pop)");
+        }
+        self.locals.pop();
+    }
+    pub fn get_local_depth(&self, name: String) -> usize {
+        if self.locals.is_empty() {
+            panic!("empty locals stash (get)");
+        }
+        let mut i = self.locals.len() - 1;
+        loop {
+            if self.locals[i].name == name {
+                return self.locals[i].depth;
+            }
+            if i == 0 {
+                panic!("local not found: {}", name);
+            } else {
+                i = i - 1;
+            }
+        }
+    }
+}
+*/
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Instruction {
