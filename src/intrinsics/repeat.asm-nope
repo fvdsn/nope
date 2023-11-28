@@ -1,0 +1,22 @@
+repeat(count, expr)          # stack
+
+000  count()                 # count?
+001: to_num()                # count
+00a: jump_ifn_zero(002)
+     pop()                   # 
+     push_val(void)          # void
+00b: jump(999)               # res=void
+002: expr()                  # count, exprv
+     swap()                  # exprv, count
+005: decr()                  # exprv, count-1
+006: jump_ifn_zero(007)
+     pop()                   # exprv
+00c: jump(999)               # res=exprv
+007: swap()                  # count-1, exprv
+008: expr()                  # count-1, exprv, exprvn
+009: add()                   # count-1, exprvnn
+010: swap()                  # exprvnn, count-1
+011: decr()                  # exprvnn, count-2
+012: jump_ifn_zero(007)
+013: pop()                   # exprvnn
+999:                         # res=exprvnn
