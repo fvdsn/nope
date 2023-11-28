@@ -24,6 +24,12 @@ impl Value {
             // _ => true,
         }
     }
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Value::Num(num) => *num == 0.0,
+            _ => false,
+        }
+    }
     pub fn is_nullish(&self) -> bool {
         match self {
             Value::Null => true,
@@ -98,10 +104,12 @@ pub enum Instruction {
     DefineGlobal(usize),
     GetGlobal(usize),
     SetGlobal(usize),
-    Jump(usize),
-    JumpIfFalse(usize),
-    JumpIfTrue(usize),
-    JumpIfNotNullish(usize),
+    Jump(i64),
+    JumpIfFalse(i64),
+    JumpIfTrue(i64),
+    JumpIfNotNullish(i64),
+    JumpIfNotZero(i64),
+    Swap,
     Pop,
     Return,
     Negate,

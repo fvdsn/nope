@@ -313,11 +313,11 @@ impl Vm {
                 let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
 
                 self.chunk.rewrite(jmp_to_else_idx, Instruction::JumpIfFalse(
-                    jmp_to_else_target_idx - jmp_to_else_idx - 1
+                    jmp_to_else_target_idx as i64 - jmp_to_else_idx as i64
                 ));
 
                 self.chunk.rewrite(jmp_to_end_idx, Instruction::Jump(
-                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                    jmp_to_end_target_idx as i64 - jmp_to_end_idx as i64
                 ));
             },
             AstNode::FunctionCall(_, name, args) => {
@@ -376,7 +376,7 @@ impl Vm {
                 let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
 
                 self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfFalse(
-                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                    jmp_to_end_target_idx as i64 - jmp_to_end_idx as i64 
                 ));
             },
             AstNode::BinaryOperator(_, BinaryOperator::Or, lexpr_node_idx, rexpr_node_idx) => {
@@ -396,7 +396,7 @@ impl Vm {
                 let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
 
                 self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfTrue(
-                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                    jmp_to_end_target_idx as i64 - jmp_to_end_idx as i64
                 ));
             },
             AstNode::BinaryOperator(_, BinaryOperator::NullishOr, lexpr_node_idx, rexpr_node_idx) => {
@@ -416,7 +416,71 @@ impl Vm {
                 let jmp_to_end_target_idx = self.chunk.last_instr_idx() + 1;
 
                 self.chunk.rewrite(jmp_to_end_idx, Instruction::JumpIfNotNullish(
-                    jmp_to_end_target_idx - jmp_to_end_idx - 1
+                    jmp_to_end_target_idx as i64 - jmp_to_end_idx as i64
+                ));
+            },
+            AstNode::BinaryOperator(_, BinaryOperator::Repeat, cexpr_node_idx, vexpr_node_idx) => {
+                if !self.compile_node(ast, *cexpr_node_idx) {
+                    println!("error compiling count of *:");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::Num);
+                self.chunk.write(node_idx, Instruction::Abs);
+
+                self.chunk.write(node_idx, Instruction::JumpIfNotZero(0));
+                let idx_00a = self.chunk.last_instr_idx();
+
+                self.chunk.write(node_idx, Instruction::Pop);
+                self.chunk.write_constant(node_idx, Value::Void);
+
+                self.chunk.write(node_idx, Instruction::Jump(0));
+
+                let idx_00b = self.chunk.last_instr_idx();
+                let idx_002 = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(idx_00a, Instruction::JumpIfNotZero(
+                    idx_002 as i64 - idx_00a as i64
+                ));
+
+                if !self.compile_node(ast, *vexpr_node_idx) {
+                    println!("error compiling value of *:");
+                    return false;
+                }
+
+                self.chunk.write(node_idx, Instruction::Swap);
+                self.chunk.write(node_idx, Instruction::Decr);
+                self.chunk.write(node_idx, Instruction::JumpIfNotZero(0));
+                let idx_006 = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Pop);
+                self.chunk.write(node_idx, Instruction::Jump(0));
+                let idx_00c = self.chunk.last_instr_idx();
+                self.chunk.write(node_idx, Instruction::Swap);
+                let idx_007 = self.chunk.last_instr_idx();
+
+                self.chunk.rewrite(idx_006, Instruction::JumpIfNotZero(
+                    idx_007 as i64 - idx_006 as i64
+                ));
+
+                if !self.compile_node(ast, *vexpr_node_idx) {
+                    println!("error compiling value of *:");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::Add);
+                self.chunk.write(node_idx, Instruction::Swap);
+                self.chunk.write(node_idx, Instruction::Decr);
+                let idx_012 = self.chunk.last_instr_idx() + 1;
+                self.chunk.write(node_idx, Instruction::JumpIfNotZero(
+                    idx_007 as i64 - idx_012 as i64
+                ));
+                self.chunk.write(node_idx, Instruction::Pop);
+                let idx_999 = self.chunk.last_instr_idx() + 1;
+
+                self.chunk.rewrite(idx_00b, Instruction::Jump(
+                    idx_999 as i64 - idx_00b as i64
+                ));
+
+                self.chunk.rewrite(idx_00c, Instruction::Jump(
+                    idx_999 as i64 - idx_00c as i64
                 ));
             },
             AstNode::BinaryOperator(_, op, lexpr_node_idx, rexpr_node_idx) => {
@@ -462,6 +526,7 @@ impl Vm {
                     BinaryOperator::And            => { panic!("BinaryOperator::And case should have be handled elsewhere") },
                     BinaryOperator::Or             => { panic!("BinaryOperator::Or case should have be handled elsewhere") },
                     BinaryOperator::NullishOr      => { panic!("BinaryOperator::NullishOr case should have be handled elsewhere") },
+                    BinaryOperator::Repeat         => { panic!("BinaryOperator::Repeat case should have be handled elsewhere") },
                 }
             },
             _ => {
@@ -539,26 +604,37 @@ impl Vm {
                     self.push(value);
                 },
                 Instruction::Jump(offset) => {
-                    self.ip += offset;
+                    self.ip = (self.ip as i64 + offset - 1) as usize;
                 },
                 Instruction::JumpIfFalse(offset) => {
                     if !self.top().is_truthy() {
-                        self.ip += offset;
+                        self.ip = (self.ip as i64 + offset - 1) as usize;
                     }
                 },
                 Instruction::JumpIfNotNullish(offset) => {
                     if !self.top().is_nullish() {
-                        self.ip += offset;
+                        self.ip = (self.ip as i64 + offset - 1) as usize;
+                    }
+                },
+                Instruction::JumpIfNotZero(offset) => {
+                    if !self.top().is_zero() {
+                        self.ip = (self.ip as i64 + offset - 1) as usize;
                     }
                 },
                 Instruction::JumpIfTrue(offset) => {
                     if self.top().is_truthy() {
-                        self.ip += offset;
+                        self.ip = (self.ip as i64 + offset - 1) as usize;
                     }
                 },
                 Instruction::Num => {
                     let val = self.pop();
                     self.push(Value::Num(val.num_equiv()));
+                },
+                Instruction::Swap => {
+                    let val1 = self.pop();
+                    let val2 = self.pop();
+                    self.push(val1);
+                    self.push(val2);
                 },
                 Instruction::Negate => {
                     let val = self.pop();

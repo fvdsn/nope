@@ -50,6 +50,7 @@ pub enum BinaryOperator {
     I32Subtract,
     I32Multiply,
     I32Divide,
+    Repeat,
 }
 
 const MIN_PRECEDENCE: usize = 0;
@@ -58,6 +59,7 @@ fn operator_precedence(op: BinaryOperator) -> usize {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence
 
     match op {
+        BinaryOperator::Repeat => 3,
         BinaryOperator::And => 4,
         BinaryOperator::Or => 3,
         BinaryOperator::NullishOr => 3,
@@ -93,6 +95,7 @@ fn operator_precedence(op: BinaryOperator) -> usize {
 fn operator_associates_right(op: BinaryOperator) -> bool {
     match op {
         BinaryOperator::Power => true,
+        BinaryOperator::Repeat => true,
         _ => false,
     }
 }
@@ -477,6 +480,7 @@ impl Parser {
                     "+-="  => Some(BinaryOperator::AlmostEqual),
                     "!+-=" => Some(BinaryOperator::NotAlmostEqual),
                     "**"   => Some(BinaryOperator::Power),
+                    "*:"   => Some(BinaryOperator::Repeat),
                     "<"    => Some(BinaryOperator::Less),
                     ">"    => Some(BinaryOperator::Greater),
                     "+"    => Some(BinaryOperator::Add),
