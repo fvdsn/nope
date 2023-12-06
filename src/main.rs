@@ -68,6 +68,13 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("trace")
+                .long("trace")
+                .takes_value(false)
+                .help("Print stack and instruction during execution")
+                .required(false)
+        )
+        .arg(
             Arg::new("eval")
                 .long("eval")
                 .short('e')
@@ -86,6 +93,7 @@ fn main() {
 
     let mut config = NopeConfig {
         debug: m.is_present("debug"),
+        trace: m.is_present("trace"),
         echo_result: false,
     };
 

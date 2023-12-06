@@ -114,7 +114,6 @@ pub enum AstNode {
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
     GlobalLet(usize, String, usize, usize),
-    BlockLet(usize, String, usize, usize),
     GlobalSet(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
     IfElse(usize, usize, usize, usize), // ife $cond $expr1 $expr2
@@ -128,7 +127,7 @@ pub enum AstNode {
                                             // last usize is the expression that gives the array,
     UnaryOperator(usize, UnaryOperator, usize), 
     BinaryOperator(usize, BinaryOperator, usize, usize), 
-    GlobalBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
+    TopLevelBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
 }
 
 #[derive(PartialEq, Debug)]
@@ -154,10 +153,10 @@ pub struct ParserError {
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
-enum ExpressionType {
+enum ExpressionMode {
     TopLevel,   // part of a global block
     Single,     // normal expression
-    Multi,      // multiple expressions in parenthesis
+    Sequence,      // multiple expressions in parenthesis
 }
 
 #[derive(PartialEq, Debug)]
@@ -166,7 +165,6 @@ pub struct Parser {
     pub tokenizer: Tokenizer,
     pub ast: Vec<AstNode>,
     pub env: Env,
-    block_var_count: usize,
     nextindex: usize,
     index: usize,
     state: ParserState,
@@ -187,7 +185,6 @@ impl Parser {
             tokenizer: Tokenizer::new(source),
             ast: vec![],
             nextindex: 0,
-            block_var_count: 0,
             index: 0,
             state: ParserState::Wip,
             errors: vec![],
@@ -246,7 +243,7 @@ impl Parser {
                 }
                 println!("{}]", " ".repeat(indent));
             },
-            AstNode::GlobalBlock(_, expressions) => {
+            AstNode::TopLevelBlock(_, expressions) => {
                 for expression in expressions {
                     self._pretty_print_ast(*expression, indent, false);
                 }
@@ -262,11 +259,6 @@ impl Parser {
             },
             AstNode::GlobalLet(_, name, val_index, expr_index) => {
                 print!("{}let (global) {} ", " ".repeat(original_indent), name);
-                self._pretty_print_ast(*val_index, indent + 2, true);
-                self._pretty_print_ast(*expr_index, indent, false);
-            },
-            AstNode::BlockLet(_, name, val_index, expr_index) => {
-                print!("{}let (block) {} ", " ".repeat(original_indent), name);
                 self._pretty_print_ast(*val_index, indent + 2, true);
                 self._pretty_print_ast(*expr_index, indent, false);
             },
@@ -713,7 +705,7 @@ impl Parser {
             }
         }
 
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -770,7 +762,7 @@ impl Parser {
                         }
                     }
 
-                    self.parse_expression(false, false, None);
+                    self.parse_expression(ExpressionMode::Single, None);
                     if self.parsing_failed() {
                         return;
                     }
@@ -800,7 +792,7 @@ impl Parser {
                     },
                 };
                 self.nextt();
-                self.parse_expression(false, false, None);
+                self.parse_expression(ExpressionMode::Single, None);
                 if self.parsing_failed() {
                     return;
                 }
@@ -809,7 +801,7 @@ impl Parser {
             } else {
                 let (line, col) = self.peek_line_col();
 
-                self.parse_expression(false, false, None);
+                self.parse_expression(ExpressionMode::Single, None);
                 if self.parsing_failed() {
                     return;
                 }
@@ -839,7 +831,7 @@ impl Parser {
         }
 
         let set_idx = self.index;
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -892,7 +884,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -913,7 +905,7 @@ impl Parser {
         }
 
         let do_idx = self.index;
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -927,7 +919,7 @@ impl Parser {
             self.push_error(eline, ecol, "ERROR: expected expression for 'do'".to_owned());
             return;
         } else {
-            self.parse_expression(false, false, None);
+            self.parse_expression(ExpressionMode::Single, None);
             if self.parsing_failed() {
                 return;
             }
@@ -944,7 +936,7 @@ impl Parser {
         }
 
         let if_idx = self.index;
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -956,7 +948,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
@@ -971,7 +963,7 @@ impl Parser {
                 return;
             }
 
-            self.parse_expression(false, false, None);
+            self.parse_expression(ExpressionMode::Single, None);
             if self.parsing_failed() {
                 return;
             }
@@ -983,7 +975,10 @@ impl Parser {
         self.ast.push(AstNode::IfElse(if_idx, cond_idx, expr_idx, expr2_idx));
     }
 
-    fn parse_let(&mut self, is_const: bool, global_scope: bool, code_block: bool) {
+    fn parse_let(&mut self, mode: ExpressionMode, is_const: bool) {
+        let global_scope: bool = matches!(mode, ExpressionMode::TopLevel);
+
+        let (let_line, let_col) = self.cur_line_col();
         let (line, col) = self.peek_line_col();
         if self.peek_closing_element() {
             self.push_error(line, col, "ERROR: expected identifier after 'let'".to_owned());
@@ -1018,7 +1013,7 @@ impl Parser {
                         self.nextt();
                     }
         
-                    self.parse_expression(false, false, Some(var_name));
+                    self.parse_expression(ExpressionMode::Single, Some(var_name));
                     if self.parsing_failed() {
                         return;
                     }
@@ -1042,10 +1037,24 @@ impl Parser {
                     };
 
                     if !self.peek_closing_element() {
-                        if global_scope {
-                            self.parse_expression(global_scope, code_block, None);
-                        } else {
-                            self.parse_continuation();
+                        match mode {
+                            ExpressionMode::TopLevel => {
+                                self.parse_expression(ExpressionMode::TopLevel, None);
+                            },
+                            ExpressionMode::Single => {
+                                self.parse_expression(ExpressionMode::Single, None);
+                            },
+                            ExpressionMode::Sequence => {
+                                let (line, col) = self.peek_line_col();
+                                if line <= let_line {
+                                    self.push_error(line, col, "ERROR: cannot have two expressions on the same line in a block".to_owned());
+                                    return;
+                                } else if col != let_col {
+                                    self.push_error(line, col, "ERROR: must have the same indentation as the let/var declaration in the block".to_owned());
+                                    return;
+                                }
+                                self.parse_expression_sequence();
+                            },
                         }
                         if self.parsing_failed() {
                             return;
@@ -1054,17 +1063,13 @@ impl Parser {
                         self.ast.push(AstNode::Void(let_idx));
                     }
 
-                    if code_block {
-                        self.block_var_count += 1;
-                    } else if !global_scope {
+                    if !global_scope {
                         self.env.pop_entry();
                     }
 
                     let expr_idx = self.cur_ast_node_index();
                     if global_scope {
                         self.ast.push(AstNode::GlobalLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
-                    } else if code_block {
-                        self.ast.push(AstNode::BlockLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
                     } else {
                         self.ast.push(AstNode::LocalLet(let_idx, var_name.to_owned(), def_idx, expr_idx));
                     }
@@ -1119,9 +1124,9 @@ impl Parser {
                         let (aline, acol) = self.peek_line_col();
 
                         if explicit_func_call {
-                            self.parse_expression(false, false, None);
+                            self.parse_expression(ExpressionMode::Single, None);
                         } else {
-                            self.parse_unary(false, false, None);
+                            self.parse_unary(ExpressionMode::Single, None);
                         }
 
                         if self.parsing_failed() {
@@ -1225,7 +1230,7 @@ impl Parser {
             return;
         }
 
-        self.parse_expression(false, false, None);
+        self.parse_expression(ExpressionMode::Single, None);
 
         if self.parsing_failed() {
             return;
@@ -1234,15 +1239,12 @@ impl Parser {
         self.ast.push(AstNode::StaticKeyAccess(key_name_idx, key_name, self.cur_ast_node_index()));
     }
 
-    fn parse_expression(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
-        // - global_scope is true if the expression makes variables declaration part of the global
-        // scope
-        // - code_block is true if the expression makes variables declarations part of a multi
-        // expression code block
+    // fn parse_expression(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
+    fn parse_expression(&mut self, mode: ExpressionMode, var_name: Option<&str>) {
         // - var_name is the name of the variable this expression will be assigned to;
         // used to handle recursion
 
-        self.parse_unary(global_scope, code_block, var_name);
+        self.parse_unary(mode, var_name);
 
         if self.parsing_failed() {
             return;
@@ -1253,10 +1255,11 @@ impl Parser {
         self.parse_binary(left_node_index, MIN_PRECEDENCE, var_name);
     }
 
-    fn parse_continuation(&mut self) {
+    fn parse_expression_sequence(&mut self) {
         let do_idx = self.index;
 
-        self.parse_expression(false, false, None);
+        let (line1, col1) = self.peek_line_col();
+        self.parse_expression(ExpressionMode::Sequence, None);
         
         if self.parsing_failed() {
             return;
@@ -1268,9 +1271,18 @@ impl Parser {
 
         let expr1_idx = self.cur_ast_node_index();
 
-        self.parse_continuation();
+        let (line2, col2) = self.peek_line_col();
+        self.parse_expression_sequence();
 
         if self.parsing_failed() {
+            return;
+        }
+
+        if line2 <= line1 {
+            self.push_error(line2, col2, "ERROR: cannot have two expressions on the same line in a block".to_owned());
+            return;
+        } else if col1 != col2 {
+            self.push_error(line2, col2, "ERROR: must have the same indentation as previous expression in the block".to_owned());
             return;
         }
 
@@ -1297,7 +1309,7 @@ impl Parser {
 
                 let op_token_index = self.index;
 
-                self.parse_unary(false, false, var_name);
+                self.parse_unary(ExpressionMode::Single, var_name);
 
                 let mut right_node_index = self.cur_ast_node_index();
 
@@ -1348,7 +1360,7 @@ impl Parser {
         }
     }
 
-    fn parse_unary(&mut self, global_scope: bool, code_block: bool, var_name: Option<&str>) {
+    fn parse_unary(&mut self, mode: ExpressionMode, var_name: Option<&str>) {
 
         let dot_after_token = self.peek2_dot();
         let token = &self.nextt();
@@ -1374,7 +1386,7 @@ impl Parser {
                 };
             },
             Token {value: TokenValue::PipeLeft, ..} => {
-                self.parse_expression(false, false, None);
+                self.parse_expression(ExpressionMode::Single, None);
             },
             Token {value: TokenValue::Operator(ref operator), ..} => {
                 if operator == "!" || operator == "-"  || operator == "+" {
@@ -1393,7 +1405,7 @@ impl Parser {
 
                     let op_token_index = self.index;
 
-                    self.parse_expression(false, false, None);
+                    self.parse_expression(ExpressionMode::Single, None);
                     if self.parsing_failed() {
                         return;
                     }
@@ -1420,9 +1432,9 @@ impl Parser {
                 } else if name == "void" || name == "_" || name == "end" {
                     self.ast.push(AstNode::Void(self.index));
                 } else if name == "let" {
-                    self.parse_let(true, global_scope, code_block);
+                    self.parse_let(mode, true);
                 } else if name == "var" {
-                    self.parse_let(false, global_scope, code_block);
+                    self.parse_let(mode, false);
                 } else if name == "set" {
                     self.parse_set();
                 } else if name == "if" {
@@ -1441,7 +1453,7 @@ impl Parser {
                     self.nextt();
                     return;
                 }
-                self.parse_continuation();
+                self.parse_expression_sequence();
 
                 if self.parsing_failed() {
                     return;
@@ -1477,7 +1489,7 @@ impl Parser {
 
     fn parse_global_block(&mut self) {
         let mut expressions_indexes:Vec<usize> = vec![];
-        let code_block_token_index = self.index;
+        let block_token_index = self.index;
 
         let mut prev_line = 0;
         let mut prev_col = 0;
@@ -1489,7 +1501,7 @@ impl Parser {
             }
 
             let (line, col) = self.peek_line_col();
-            self.parse_expression(true, true, None);
+            self.parse_expression(ExpressionMode::TopLevel, None);
             if self.parsing_failed() {
                 return;
             }
@@ -1513,7 +1525,7 @@ impl Parser {
         }
 
         if expressions_indexes.len() >= 2 {
-            self.ast.push(AstNode::GlobalBlock(code_block_token_index, expressions_indexes));
+            self.ast.push(AstNode::TopLevelBlock(block_token_index, expressions_indexes));
         }
     }
 
@@ -1546,6 +1558,7 @@ mod tests {
 
     const CONFIG: NopeConfig = NopeConfig {
         debug: true,
+        trace: false,
         echo_result: false,
     };
     
@@ -1950,14 +1963,13 @@ mod tests {
 
     #[test]
     fn test_parse_let_defines_local_var() {
-        let mut parser = Parser::new(CONFIG, String::from("(let x 3 x)"));
+        let mut parser = Parser::new(CONFIG, String::from("(\nlet x 3\nx)"));
         let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(3, 3.0),
             AstNode::LocalValueReference(4, "x".to_owned()),
-            AstNode::BlockLet(1, "x".to_owned(), 0, 1),
-            AstNode::GlobalBlock(0, vec![2])
+            AstNode::LocalLet(1, "x".to_owned(), 0, 1),
         ]);
         assert_eq!(None, parser.env.get_entry(&"x".to_owned()));
         assert_eq!(envsize, parser.env.size());
@@ -2717,7 +2729,7 @@ mod tests {
             AstNode::FunctionCall(0, "print".to_owned(), vec![0]),
             AstNode::Number(3, 4.92),
             AstNode::FunctionCall(2, "print".to_owned(), vec![2]),
-            AstNode::GlobalBlock(0, vec![1, 3]),
+            AstNode::TopLevelBlock(0, vec![1, 3]),
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2733,7 +2745,7 @@ mod tests {
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
             AstNode::GlobalValueReference(5, "a".to_owned()),
             AstNode::FunctionCall(4, "print".to_owned(), vec![3]),
-            AstNode::GlobalBlock(0, vec![2, 4])
+            AstNode::TopLevelBlock(0, vec![2, 4])
         ]);
     }
 
@@ -2896,6 +2908,72 @@ mod tests {
             AstNode::FunctionCall(4, "not".to_owned(), vec![1]),
             AstNode::BinaryOperator(3, BinaryOperator::Add, 0, 2),
             AstNode::FunctionCall(0, "neg".to_owned(), vec![3])
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_repeat_op() {
+        let mut parser = Parser::new(CONFIG, String::from("3 *: 4"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 3.0),
+            AstNode::Number(2, 4.0),
+            AstNode::BinaryOperator(1, BinaryOperator::Repeat, 0, 1),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_repeat_op_chain() {
+        let mut parser = Parser::new(CONFIG, String::from("3 *: 4 *: 5"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 3.0),
+            AstNode::Number(2, 4.0),
+            AstNode::Number(4, 5.0),
+            AstNode::BinaryOperator(3, BinaryOperator::Repeat, 1, 2),
+            AstNode::BinaryOperator(1, BinaryOperator::Repeat, 0, 3),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_repeat_neg() {
+        let mut parser = Parser::new(CONFIG, String::from("-3 *: 4"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.0),
+            AstNode::Number(3, 4.0),
+            AstNode::BinaryOperator(2, BinaryOperator::Repeat, 0, 1),
+            AstNode::UnaryOperator(0, UnaryOperator::Negate, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_pow_neg() {
+        let mut parser = Parser::new(CONFIG, String::from("-3 ** 4"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(1, 3.0),
+            AstNode::Number(3, 4.0),
+            AstNode::BinaryOperator(2, BinaryOperator::Power, 0, 1),
+            AstNode::UnaryOperator(0, UnaryOperator::Negate, 2)
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
+    fn test_parse_left_arrow() {
+        let mut parser = Parser::new(CONFIG, String::from("3 * <- 4 + 5"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+            AstNode::Number(0, 3.0),
+            AstNode::Number(3, 4.0),
+            AstNode::Number(5, 5.0),
+            AstNode::BinaryOperator(4, BinaryOperator::Add, 1, 2),
+            AstNode::BinaryOperator(1, BinaryOperator::Multiply, 0, 3)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }

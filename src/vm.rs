@@ -69,6 +69,10 @@ impl Vm {
         };
     }
 
+    fn print_trace(&self) {
+        println!("{:<24} {:?}", format!("{:?}", self.chunk.code[self.ip]), self.stack);
+    }
+
     pub fn get_copy_of_last_env(&self) -> Option<Env> {
         if self.parsers.is_empty() {
             return None;
@@ -224,7 +228,18 @@ impl Vm {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
                 self.chunk.write_constant(node_idx, Value::String(str_ref));
             },
-            AstNode::GlobalBlock(_, expression_idx_list) => {
+            AstNode::Do(_, expr1, expr2) => {
+                if !self.compile_node(ast, *expr1) {
+                    println!("error compiling first expression of Do");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::Pop);
+                if !self.compile_node(ast, *expr2) {
+                    println!("error compiling second expression of Do");
+                    return false;
+                }
+            },
+            AstNode::TopLevelBlock(_, expression_idx_list) => {
                 for idx in expression_idx_list {
                     if !self.compile_node(ast, *idx) {
                         println!("error compiling code block");
@@ -545,6 +560,7 @@ impl Vm {
             if self.config.echo_result && !self.chunk.is_last_instruction_echo_or_print() {
                 self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Echo);
             }
+            self.chunk.write(0, Instruction::Pop);
             self.chunk.write(self.chunk.ast_map[self.chunk.ast_map.len()-1], Instruction::Return);
         } else {
             self.chunk.write(0, Instruction::Return);
@@ -554,6 +570,9 @@ impl Vm {
 
     pub fn run(&mut self) -> InterpretResult {
         loop {
+            if self.config.trace {
+                self.print_trace();
+            }
             // println!("ip:{}", self.ip);
             let instr = self.chunk.code[self.ip];
             self.ip += 1;

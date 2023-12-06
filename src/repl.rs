@@ -76,7 +76,7 @@ impl Validator for InputValidator {
     fn validate(&self, ctx: &mut ValidationContext) -> Result<ValidationResult> {
         use ValidationResult::{Incomplete, Valid};
         let input = ctx.input();
-        let config = NopeConfig{ debug:false, echo_result:false };
+        let config = NopeConfig{ debug:false, trace: false, echo_result:false };
         let shared = (*self.shared_env).clone();
         let mut parser = Parser::new_with_env(
             config,
