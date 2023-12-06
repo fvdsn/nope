@@ -106,6 +106,7 @@ pub enum Instruction {
     GetGlobal(usize),
     SetGlobal(usize),
     LoadFromStack(usize),
+    SetInStack(usize),
     Jump(i64),
     JumpIfFalse(i64),
     JumpIfTrue(i64),

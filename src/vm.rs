@@ -97,6 +97,10 @@ impl Vm {
         self.stack[depth]
     }
 
+    fn set_at_depth(&mut self, depth: usize, value: Value) {
+        self.stack[depth] = value;
+    }
+
     fn intern(&mut self, name: String) -> GcRef<String> {
     //    self.mark_and_sweep();
         self.gc.intern(name)
@@ -268,20 +272,6 @@ impl Vm {
                     return false;
                 }
             },
-            AstNode::LocalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
-                if !self.compile_node(ast, *value_expr_node_idx) {
-                    println!("error compiling expression value for global variable {}", name);
-                    return false;
-                }
-                self.locals.add_local(name.to_owned());
-                if !self.compile_node(ast, *next_expr_node_idx) {
-                    println!("error compile continuation expression for global variable {}", name);
-                    return false;
-                }
-                self.locals.pop();
-                self.chunk.write(node_idx, Instruction::Swap);
-                self.chunk.write(node_idx, Instruction::Pop);
-            },
             AstNode::GlobalSet(_, value_target_idx, value_expr_node_idx) => {
                 let name = match ast.get_ast_node(*value_target_idx) {
                     AstNode::GlobalValueReference(_, name) => name,
@@ -299,6 +289,32 @@ impl Vm {
                 let name_ref = self.gc.intern(var_name.to_owned());
                 let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
                 self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
+            },
+            AstNode::LocalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
+                if !self.compile_node(ast, *value_expr_node_idx) {
+                    println!("error compiling expression value for global variable {}", name);
+                    return false;
+                }
+                self.locals.add_local(name.to_owned());
+                if !self.compile_node(ast, *next_expr_node_idx) {
+                    println!("error compile continuation expression for global variable {}", name);
+                    return false;
+                }
+                self.locals.pop();
+                self.chunk.write(node_idx, Instruction::Swap);
+                self.chunk.write(node_idx, Instruction::Pop);
+            },
+            AstNode::LocalSet(_, value_target_idx, value_expr_node_idx) => {
+                let name = match ast.get_ast_node(*value_target_idx) {
+                    AstNode::LocalValueReference(_, name) => name,
+                    _ => panic!("attempting to local set a non local var"),
+                };
+                let depth = self.locals.get_local_depth(&name);
+                if !self.compile_node(ast, *value_expr_node_idx) {
+                    println!("error compiling expression value for local variable {}", name);
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::SetInStack(depth));
             },
             AstNode::LocalValueReference(_, var_name) => {
                 let depth = self.locals.get_local_depth(var_name);
@@ -639,6 +655,10 @@ impl Vm {
                 Instruction::LoadFromStack(depth) => {
                     let value = self.get_at_depth(depth);
                     self.push(value);
+                },
+                Instruction::SetInStack(depth) => {
+                    let value = self.top();
+                    self.set_at_depth(depth, value);
                 },
                 Instruction::Jump(offset) => {
                     self.ip = (self.ip as i64 + offset - 1) as usize;

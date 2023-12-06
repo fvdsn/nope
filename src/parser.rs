@@ -113,6 +113,7 @@ pub enum AstNode {
     LocalLet(usize, String, usize, usize), // String is name of var,
                                      // second usize index of the value expression,
                                      // last usize the expression in which the variable is defined
+    LocalSet(usize, usize, usize), // set $target $expr
     GlobalLet(usize, String, usize, usize),
     GlobalSet(usize, usize, usize), // set $target $expr
     Do(usize, usize, usize), // do $expr1 $expr1
@@ -274,7 +275,12 @@ impl Parser {
                 self._pretty_print_ast(*expr_2, indent, false);
             },
             AstNode::GlobalSet(_, target, expr) => {
-                println!("{}set", " ".repeat(original_indent));
+                println!("{}set (global)", " ".repeat(original_indent));
+                self._pretty_print_ast(*target, indent + 2, false);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            },
+            AstNode::LocalSet(_, target, expr) => {
+                println!("{}set (local)", " ".repeat(original_indent));
                 self._pretty_print_ast(*target, indent + 2, false);
                 self._pretty_print_ast(*expr, indent + 2, false);
             },
@@ -893,7 +899,7 @@ impl Parser {
         if global_set {
             self.ast.push(AstNode::GlobalSet(set_idx, target_idx, expr_idx));
         } else {
-            panic!("LocalSet not implemented"); // FIXME
+            self.ast.push(AstNode::LocalSet(set_idx, target_idx, expr_idx));
         }
     }
 
