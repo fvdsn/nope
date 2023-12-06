@@ -355,6 +355,41 @@ impl Vm {
                     jmp_to_end_target_idx as i64 - jmp_to_end_idx as i64
                 ));
             },
+            AstNode::WhileLoop(_, cond_expr_node_idx, expr_node_idx) => {
+
+                self.chunk.write(node_idx, Instruction::PushVoid);
+
+                let idx_001 = self.chunk.last_instr_idx() + 1;
+
+                if !self.compile_node(ast, *cond_expr_node_idx) {
+                    println!("error compiling while condition");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::JumpIfFalse(0));
+                let jmp_to_999_idx = self.chunk.last_instr_idx();
+
+                self.chunk.write(node_idx, Instruction::Pop);
+                self.chunk.write(node_idx, Instruction::Pop);
+
+                if !self.compile_node(ast, *expr_node_idx) {
+                    println!("error compiling true branch of if block");
+                    return false;
+                }
+
+                self.chunk.write(node_idx, Instruction::Jump(0));
+                let jmp_to_001_idx = self.chunk.last_instr_idx();
+
+                self.chunk.write(node_idx, Instruction::Pop);
+                let idx_999 = self.chunk.last_instr_idx();
+
+                self.chunk.rewrite(jmp_to_999_idx, Instruction::JumpIfFalse(
+                    idx_999 as i64 - jmp_to_999_idx as i64
+                ));
+
+                self.chunk.rewrite(jmp_to_001_idx, Instruction::Jump(
+                    idx_001 as i64 - jmp_to_001_idx as i64
+                ));
+            },
             AstNode::FunctionCall(_, name, args) => {
                 for arg in args {
                     if !self.compile_node(ast, *arg) {
@@ -635,6 +670,7 @@ impl Vm {
                     let global_name = self.chunk.read_constant_string(cst_idx);
                     let value = self.pop();
                     self.globals.insert(global_name, value);
+                    self.pop();
                 },
                 Instruction::GetGlobal(cst_idx) => {
                     let global_name = self.chunk.read_constant_string(cst_idx);
@@ -650,6 +686,7 @@ impl Vm {
                     let global_name = self.chunk.read_constant_string(cst_idx);
                     let value = self.pop();
                     self.globals.insert(global_name, value);
+                    self.pop();
                     self.push(value);
                 },
                 Instruction::LoadFromStack(depth) => {

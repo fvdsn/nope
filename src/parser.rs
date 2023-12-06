@@ -129,6 +129,7 @@ pub enum AstNode {
     UnaryOperator(usize, UnaryOperator, usize), 
     BinaryOperator(usize, BinaryOperator, usize, usize), 
     TopLevelBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
+    WhileLoop(usize, usize, usize), // while $cond $expr
 }
 
 #[derive(PartialEq, Debug)]
@@ -289,6 +290,11 @@ impl Parser {
                 self._pretty_print_ast(*cond, indent + 2, false);
                 self._pretty_print_ast(*expr, indent + 2, false);
                 self._pretty_print_ast(*expr_2, indent, false);
+            }
+            AstNode::WhileLoop(_, cond, expr) => {
+                println!("{}while", " ".repeat(original_indent));
+                self._pretty_print_ast(*cond, indent + 2, false);
+                self._pretty_print_ast(*expr, indent + 2, false);
             }
             AstNode::FunctionDef(_, args, expr_body) => {
                 print!("{}|", " ".repeat(original_indent));
@@ -981,6 +987,36 @@ impl Parser {
         self.ast.push(AstNode::IfElse(if_idx, cond_idx, expr_idx, expr2_idx));
     }
 
+    fn parse_while(&mut self) {
+        let (line, col) = self.peek_line_col();
+        if self.peek_closing_element() {
+            self.push_incomplete(line, col, "ERROR: expected condition after 'while'".to_owned());
+            return;
+        }
+
+        let while_idx = self.index;
+        self.parse_expression(ExpressionMode::Single, None);
+        if self.parsing_failed() {
+            return;
+        }
+        let cond_idx = self.cur_ast_node_index();
+        if self.peek_closing_element() {
+            let (eline, ecol) = self.peek_line_col();
+            self.push_info(line, col, "this while is missing an expression".to_owned());
+            self.push_incomplete(eline, ecol, "ERROR: expected body expression for 'while'".to_owned());
+            return;
+        }
+
+        self.parse_expression(ExpressionMode::Single, None);
+        if self.parsing_failed() {
+            return;
+        }
+
+        let expr_idx = self.cur_ast_node_index();
+
+        self.ast.push(AstNode::WhileLoop(while_idx, cond_idx, expr_idx));
+    }
+
     fn parse_let(&mut self, mode: ExpressionMode, is_const: bool) {
         let global_scope: bool = matches!(mode, ExpressionMode::TopLevel);
 
@@ -1447,6 +1483,8 @@ impl Parser {
                     self.parse_ife();
                 } else if name == "do" {
                     self.parse_do();
+                } else if name == "while" {
+                    self.parse_while();
                 } else {
                     let func_name:String = name.to_owned();
                     self.parse_func_call(func_name);
