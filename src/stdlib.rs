@@ -36,19 +36,19 @@ impl Stdlib {
         def_zero_arg("random", vec![Instruction::Random]);
         def_zero_arg("rand100", vec![
             Instruction::Random,
-            Instruction::ConstantNum(100.0),
+            Instruction::PushNum(100.0),
             Instruction::Multiply,
             Instruction::Floor,
         ]);
         def_zero_arg("flip_coin", vec![
             Instruction::Random,
-            Instruction::ConstantNum(0.5),
+            Instruction::PushNum(0.5),
             Instruction::GreaterOrEqual,
         ]);
         for num in [4, 6, 8, 10, 12, 20, 100] {
             def_zero_arg(&format!("d{}", num), vec![
                 Instruction::Random,
-                Instruction::ConstantNum(f64::from(num)),
+                Instruction::PushNum(f64::from(num)),
                 Instruction::Multiply,
                 Instruction::Ceil,
             ]);
@@ -112,15 +112,15 @@ impl Stdlib {
         def_one_arg("bitstr", vec![Instruction::Bitstr]);
         def_one_arg("read_text", vec![Instruction::ReadTextFileSync]);
         def_one_arg("is_even", vec![
-            Instruction::ConstantNum(2.0),
+            Instruction::PushNum(2.0),
             Instruction::Modulo,
-            Instruction::ConstantNum(0.0),
+            Instruction::PushNum(0.0),
             Instruction::Equal,
         ]);
         def_one_arg("is_odd", vec![
-            Instruction::ConstantNum(2.0),
+            Instruction::PushNum(2.0),
             Instruction::Modulo,
-            Instruction::ConstantNum(0.0),
+            Instruction::PushNum(0.0),
             Instruction::Equal,
             Instruction::Not,
         ]);

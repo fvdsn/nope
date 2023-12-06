@@ -213,16 +213,16 @@ impl Vm {
     fn compile_node(&mut self, ast: &Parser, node_idx: usize) -> bool {
         match &ast.ast[node_idx] {
             AstNode::Number(_, num) => {
-                self.chunk.write_constant(node_idx, Value::Num(*num));
+                self.chunk.write(node_idx, Instruction::PushNum(*num));
             },
             AstNode::Null(_) => {
-                self.chunk.write_constant(node_idx, Value::Null);
+                self.chunk.write(node_idx, Instruction::PushNull);
             },
             AstNode::Void(_) => {
-                self.chunk.write_constant(node_idx, Value::Void);
+                self.chunk.write(node_idx, Instruction::PushVoid);
             },
             AstNode::Boolean(_, val) => {
-                self.chunk.write_constant(node_idx, Value::Boolean(*val));
+                self.chunk.write(node_idx, Instruction::PushBool(*val));
             },
             AstNode::String(_, val) => {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
@@ -440,13 +440,14 @@ impl Vm {
                     return false;
                 }
                 self.chunk.write(node_idx, Instruction::Num);
-                self.chunk.write(node_idx, Instruction::Abs);
+                self.chunk.write(node_idx, Instruction::PushNum(0.0));
+                self.chunk.write(node_idx, Instruction::Max);
 
                 self.chunk.write(node_idx, Instruction::JumpIfNotZero(0));
                 let idx_00a = self.chunk.last_instr_idx();
 
                 self.chunk.write(node_idx, Instruction::Pop);
-                self.chunk.write_constant(node_idx, Value::Void);
+                self.chunk.write(node_idx, Instruction::PushVoid);
 
                 self.chunk.write(node_idx, Instruction::Jump(0));
 
@@ -598,8 +599,17 @@ impl Vm {
                     let cst = self.chunk.read_constant(cst_idx);
                     self.push(cst);
                 },
-                Instruction::ConstantNum(num)  => {
+                Instruction::PushNum(num)  => {
                     self.push(Value::Num(num));
+                },
+                Instruction::PushVoid  => {
+                    self.push(Value::Void);
+                },
+                Instruction::PushNull  => {
+                    self.push(Value::Null);
+                },
+                Instruction::PushBool(val)  => {
+                    self.push(Value::Boolean(val));
                 },
                 Instruction::DefineGlobal(cst_idx)  => {
                     let global_name = self.chunk.read_constant_string(cst_idx);

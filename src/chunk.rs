@@ -100,7 +100,10 @@ impl LocalsTable {
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Instruction {
     Constant(usize),
-    ConstantNum(f64),
+    PushNum(f64),
+    PushVoid,
+    PushNull,
+    PushBool(bool),
     DefineGlobal(usize),
     GetGlobal(usize),
     SetGlobal(usize),
