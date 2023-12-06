@@ -93,13 +93,12 @@ impl Stdlib {
         def_one_arg("inv",    vec![Instruction::Inv]);
         def_one_arg("log2",   vec![Instruction::Log2]);
         def_one_arg("log10",  vec![Instruction::Log10]);
-        def_one_arg("ln1p",  vec![Instruction::Ln1p]);
+        def_one_arg("ln1p",   vec![Instruction::Ln1p]);
         def_one_arg("ln",     vec![Instruction::Ln]);
         def_one_arg("exp",    vec![Instruction::Exp]);
         def_one_arg("expm1",  vec![Instruction::Expm1]);
         def_one_arg("sqrt",   vec![Instruction::Sqrt]);
         def_one_arg("cbrt",   vec![Instruction::Cbrt]);
-        // def_one_arg("clz32",  vec![Instruction::Clz32]);
         def_one_arg("round",  vec![Instruction::Round]);
         def_one_arg("fround", vec![Instruction::Fround]);
         def_one_arg("trunc",  vec![Instruction::Trunc]);
