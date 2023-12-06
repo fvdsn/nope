@@ -10,3 +10,5 @@ Intersting Documentations and Resources
 ## Forums
 - https://www.reddit.com/r/ProgrammingLanguages/
 
+## Rust
+- https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md

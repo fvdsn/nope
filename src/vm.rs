@@ -224,7 +224,7 @@ impl Vm {
                 let str_ref = self.gc.intern(val.to_owned()); //FIXME should be self.intern ?
                 self.chunk.write_constant(node_idx, Value::String(str_ref));
             },
-            AstNode::CodeBlock(_, expression_idx_list, _) => {
+            AstNode::GlobalBlock(_, expression_idx_list) => {
                 for idx in expression_idx_list {
                     if !self.compile_node(ast, *idx) {
                         println!("error compiling code block");

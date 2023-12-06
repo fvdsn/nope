@@ -128,8 +128,7 @@ pub enum AstNode {
                                             // last usize is the expression that gives the array,
     UnaryOperator(usize, UnaryOperator, usize), 
     BinaryOperator(usize, BinaryOperator, usize, usize), 
-    CodeBlock(usize, Vec<usize>, Vec<String>), //Vec<usize> is the expressions, Vec<String> is 
-                                               //the block level variables
+    GlobalBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
 }
 
 #[derive(PartialEq, Debug)]
@@ -152,6 +151,13 @@ pub struct ParserError {
     col: usize,
     message: String,
     severity: Severity,
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+enum ExpressionType {
+    TopLevel,   // part of a global block
+    Single,     // normal expression
+    Multi,      // multiple expressions in parenthesis
 }
 
 #[derive(PartialEq, Debug)]
@@ -240,7 +246,7 @@ impl Parser {
                 }
                 println!("{}]", " ".repeat(indent));
             },
-            AstNode::CodeBlock(_, expressions, _) => {
+            AstNode::GlobalBlock(_, expressions) => {
                 for expression in expressions {
                     self._pretty_print_ast(*expression, indent, false);
                 }
@@ -518,11 +524,6 @@ impl Parser {
     fn peek_rightp(&self) -> bool {
         let token = &self.peekt();
         return matches!(token.value, TokenValue::RightP);
-    }
-
-    fn peek_rightbrkt(&self) -> bool {
-        let token = &self.peekt();
-        return matches!(token.value, TokenValue::RightBrkt);
     }
 
     fn peek_swp(&self) -> bool {
@@ -1041,7 +1042,11 @@ impl Parser {
                     };
 
                     if !self.peek_closing_element() {
-                        self.parse_expression(global_scope, code_block, None);
+                        if global_scope {
+                            self.parse_expression(global_scope, code_block, None);
+                        } else {
+                            self.parse_continuation();
+                        }
                         if self.parsing_failed() {
                             return;
                         }
@@ -1248,6 +1253,32 @@ impl Parser {
         self.parse_binary(left_node_index, MIN_PRECEDENCE, var_name);
     }
 
+    fn parse_continuation(&mut self) {
+        let do_idx = self.index;
+
+        self.parse_expression(false, false, None);
+        
+        if self.parsing_failed() {
+            return;
+        }
+
+        if self.peek_closing_element() {
+            return;
+        }
+
+        let expr1_idx = self.cur_ast_node_index();
+
+        self.parse_continuation();
+
+        if self.parsing_failed() {
+            return;
+        }
+
+        let expr2_idx = self.cur_ast_node_index();
+
+        self.ast.push(AstNode::Do(do_idx, expr1_idx, expr2_idx));
+    }
+
     fn parse_binary(
         &mut self,
         mut left_node_index: usize,
@@ -1410,7 +1441,7 @@ impl Parser {
                     self.nextt();
                     return;
                 }
-                self.parse_code_block(false);
+                self.parse_continuation();
 
                 if self.parsing_failed() {
                     return;
@@ -1423,31 +1454,6 @@ impl Parser {
                     self.push_info(pline, pcol, "unclosed '('".to_owned());
                     let (line, col) = self.peek_line_col();
                     self.push_error(line, col, "ERROR: expected closing ')'".to_owned());
-                } else {
-                    self.nextt();
-                }
-            },
-
-            Token {value: TokenValue::LeftBrkt, ..} => {
-                let (pline, pcol) = self.cur_line_col();
-                if self.peek_rightbrkt() {
-                    self.ast.push(AstNode::Void(self.index));
-                    self.nextt();
-                    return;
-                }
-                self.parse_code_block(false);
-
-                if self.parsing_failed() {
-                    return;
-                }
-                if self.peek_eof() {
-                    self.push_info(pline, pcol, "unclosed '{'".to_owned());
-                    let (line, col) = self.peek_line_col();
-                    self.push_incomplete(line, col, "ERROR: expected closing '}'".to_owned());
-                } else if !self.peek_rightbrkt() {
-                    self.push_info(pline, pcol, "unclosed '}'".to_owned());
-                    let (line, col) = self.peek_line_col();
-                    self.push_error(line, col, "ERROR: expected closing '}'".to_owned());
                 } else {
                     self.nextt();
                 }
@@ -1469,12 +1475,9 @@ impl Parser {
         }
     }
 
-    fn parse_code_block(&mut self, global_scope: bool) {
+    fn parse_global_block(&mut self) {
         let mut expressions_indexes:Vec<usize> = vec![];
-        let mut block_vars:Vec<String> = vec![];
         let code_block_token_index = self.index;
-
-        let cur_block_var_count = self.block_var_count;
 
         let mut prev_line = 0;
         let mut prev_col = 0;
@@ -1486,7 +1489,7 @@ impl Parser {
             }
 
             let (line, col) = self.peek_line_col();
-            self.parse_expression(global_scope, true, None);
+            self.parse_expression(true, true, None);
             if self.parsing_failed() {
                 return;
             }
@@ -1503,25 +1506,14 @@ impl Parser {
 
             expressions_indexes.push(self.cur_ast_node_index());
 
-            if let AstNode::BlockLet(_, var_name, _, _) = self.cur_ast_node() {
-                block_vars.push(var_name.to_owned());
-            }
-
             first_line = false;
             prev_line = line;
             prev_col = col;
 
         }
 
-        if !global_scope {
-            for _ in cur_block_var_count..self.block_var_count {
-                self.env.pop_entry();
-            }
-            self.block_var_count = cur_block_var_count;
-        }
-
-        if expressions_indexes.len() >= 2 || block_vars.len() >= 1 {
-            self.ast.push(AstNode::CodeBlock(code_block_token_index, expressions_indexes, block_vars));
+        if expressions_indexes.len() >= 2 {
+            self.ast.push(AstNode::GlobalBlock(code_block_token_index, expressions_indexes));
         }
     }
 
@@ -1540,7 +1532,7 @@ impl Parser {
             println!("build ast...");
         }
 
-        self.parse_code_block(true);
+        self.parse_global_block();
 
         if !self.parsing_failed() {
             self.state = ParserState::Done;
@@ -1965,7 +1957,7 @@ mod tests {
             AstNode::Number(3, 3.0),
             AstNode::LocalValueReference(4, "x".to_owned()),
             AstNode::BlockLet(1, "x".to_owned(), 0, 1),
-            AstNode::CodeBlock(0, vec![2], vec!["x".to_owned()])
+            AstNode::GlobalBlock(0, vec![2])
         ]);
         assert_eq!(None, parser.env.get_entry(&"x".to_owned()));
         assert_eq!(envsize, parser.env.size());
@@ -2717,7 +2709,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_code_block() {
+    fn test_parse_global_block() {
         let mut parser = Parser::new(CONFIG, String::from("print 3.14\nprint 4.92"));
         parser.parse();
         assert_eq!(parser.ast, vec![
@@ -2725,13 +2717,13 @@ mod tests {
             AstNode::FunctionCall(0, "print".to_owned(), vec![0]),
             AstNode::Number(3, 4.92),
             AstNode::FunctionCall(2, "print".to_owned(), vec![2]),
-            AstNode::CodeBlock(0, vec![1, 3], vec![])
+            AstNode::GlobalBlock(0, vec![1, 3]),
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
-    fn test_parse_code_block_env_carry_over() {
+    fn test_parse_global_block_env_carry_over() {
         let mut parser = Parser::new(CONFIG, String::from("let a 3 _\nprint a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
@@ -2741,19 +2733,19 @@ mod tests {
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
             AstNode::GlobalValueReference(5, "a".to_owned()),
             AstNode::FunctionCall(4, "print".to_owned(), vec![3]),
-            AstNode::CodeBlock(0, vec![2, 4], vec![])
+            AstNode::GlobalBlock(0, vec![2, 4])
         ]);
     }
 
     #[test]
-    fn test_parse_code_block_env_carry_over2() {
+    fn test_parse_global_block_env_carry_over2() {
         let mut parser = Parser::new(CONFIG, String::from("let a 3 let b 4 _\nadd a b"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
-    fn test_parse_code_block_env_carry_over_wrong() {
+    fn test_parse_global_block_env_carry_over_wrong() {
         let mut parser = Parser::new(CONFIG, String::from("if true let a 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
