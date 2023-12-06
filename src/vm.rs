@@ -23,7 +23,7 @@ use crate::{
         Chunk,
         Instruction,
         GlobalsTable,
-        // LocalsTable,
+        LocalsTable,
     },
     gc::{
         Gc,
@@ -46,7 +46,7 @@ pub struct Vm {
     gc: Gc,
     stdlib: Stdlib,
     globals: GlobalsTable,
-    // locals: LocalsTable,
+    locals: LocalsTable,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -59,7 +59,7 @@ impl Vm {
             parsers: vec![],
             gc: Gc::new(),
             globals: GlobalsTable::new(),
-            // locals: LocalsTable::new(),
+            locals: LocalsTable::new(),
             stdlib: Stdlib::new(),
             config,
             chunk: Chunk::new(),
@@ -91,6 +91,10 @@ impl Vm {
 
     fn top(&mut self) -> Value {
         self.stack[self.stack.len()-1]
+    }
+
+    fn get_at_depth(&mut self, depth: usize) -> Value {
+        self.stack[depth]
     }
 
     fn intern(&mut self, name: String) -> GcRef<String> {
@@ -265,17 +269,18 @@ impl Vm {
                 }
             },
             AstNode::LocalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
-                let name_ref = self.gc.intern(name.to_owned());
-                let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
                 if !self.compile_node(ast, *value_expr_node_idx) {
                     println!("error compiling expression value for global variable {}", name);
                     return false;
                 }
-                self.chunk.write(node_idx, Instruction::DefineGlobal(name_cst_idx));
+                self.locals.add_local(name.to_owned());
                 if !self.compile_node(ast, *next_expr_node_idx) {
                     println!("error compile continuation expression for global variable {}", name);
                     return false;
                 }
+                self.locals.pop();
+                self.chunk.write(node_idx, Instruction::Swap);
+                self.chunk.write(node_idx, Instruction::Pop);
             },
             AstNode::GlobalSet(_, value_target_idx, value_expr_node_idx) => {
                 let name = match ast.get_ast_node(*value_target_idx) {
@@ -296,9 +301,8 @@ impl Vm {
                 self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
             },
             AstNode::LocalValueReference(_, var_name) => {
-                let name_ref = self.gc.intern(var_name.to_owned());
-                let name_cst_idx = self.chunk.add_constant(Value::String(name_ref));
-                self.chunk.write(node_idx, Instruction::GetGlobal(name_cst_idx));
+                let depth = self.locals.get_local_depth(var_name);
+                self.chunk.write(node_idx, Instruction::LoadFromStack(depth));
             },
             AstNode::IfElse(_, cond_expr_node_idx, val_expr_node_idx, else_expr_node_idx) => {
                 if !self.compile_node(ast, *cond_expr_node_idx) {
@@ -630,6 +634,10 @@ impl Vm {
                     let global_name = self.chunk.read_constant_string(cst_idx);
                     let value = self.pop();
                     self.globals.insert(global_name, value);
+                    self.push(value);
+                },
+                Instruction::LoadFromStack(depth) => {
+                    let value = self.get_at_depth(depth);
                     self.push(value);
                 },
                 Instruction::Jump(offset) => {

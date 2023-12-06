@@ -56,7 +56,6 @@ pub struct Local {
     depth: usize,
 }
 
-/*
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct LocalsTable {
@@ -69,8 +68,8 @@ impl LocalsTable {
             locals: vec![],
         };
     }
-    pub fn add_local(&mut self, name: String, depth: usize) {
-        self.locals.push(Local {depth, name: name.to_owned()});
+    pub fn add_local(&mut self, name: String) {
+        self.locals.push(Local {depth: self.locals.len(), name: name.to_owned()});
     }
     pub fn pop(&mut self) {
         if self.locals.is_empty() {
@@ -78,7 +77,7 @@ impl LocalsTable {
         }
         self.locals.pop();
     }
-    pub fn get_local_depth(&self, name: String) -> usize {
+    pub fn get_local_depth(&self, name: &str) -> usize {
         if self.locals.is_empty() {
             panic!("empty locals stash (get)");
         }
@@ -95,7 +94,6 @@ impl LocalsTable {
         }
     }
 }
-*/
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum Instruction {
@@ -107,6 +105,7 @@ pub enum Instruction {
     DefineGlobal(usize),
     GetGlobal(usize),
     SetGlobal(usize),
+    LoadFromStack(usize),
     Jump(i64),
     JumpIfFalse(i64),
     JumpIfTrue(i64),
