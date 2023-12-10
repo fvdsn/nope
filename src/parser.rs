@@ -130,6 +130,7 @@ pub enum AstNode {
     BinaryOperator(usize, BinaryOperator, usize, usize), 
     TopLevelBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
     WhileLoop(usize, usize, usize), // while $cond $expr
+    Continue(usize),
 }
 
 #[derive(PartialEq, Debug)]
@@ -171,6 +172,7 @@ pub struct Parser {
     index: usize,
     state: ParserState,
     errors: Vec<ParserError>,
+    in_loop: Vec<bool>,
 }
 
 fn is_reserved_keyword(name: &String) -> bool {
@@ -190,6 +192,7 @@ impl Parser {
             index: 0,
             state: ParserState::Wip,
             errors: vec![],
+            in_loop: vec![false],
         };
     }
 
@@ -231,6 +234,9 @@ impl Parser {
             },
             AstNode::Void(_) => {
                 println!("{}_", " ".repeat(original_indent));
+            },
+            AstNode::Continue(_) => {
+                println!("{}continue", " ".repeat(original_indent));
             },
             AstNode::GlobalValueReference(_, str) => {
                 println!("{}{}", " ".repeat(original_indent), str);
@@ -400,6 +406,18 @@ impl Parser {
         if !self.ast.is_empty() {
             self._pretty_print_ast(self.cur_ast_node_index(), 0, false);
         }
+    }
+
+    fn is_in_loop(&self) -> bool {
+        return self.in_loop[self.in_loop.len()-1];
+    }
+
+    fn push_loop_status(&mut self, in_loop: bool) {
+        self.in_loop.push(in_loop);
+    }
+
+    fn pop_loop_status(&mut self) {
+        self.in_loop.pop();
     }
 
     fn nextt(&mut self) -> &Token {
@@ -717,10 +735,16 @@ impl Parser {
             }
         }
 
+
+        self.push_loop_status(false);
+
+        // parsing the function body
         self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
+
+        self.pop_loop_status();
 
         for _ in &func_args {
             self.env.pop_entry();
@@ -1007,10 +1031,14 @@ impl Parser {
             return;
         }
 
+        self.push_loop_status(true);
+
         self.parse_expression(ExpressionMode::Single, None);
         if self.parsing_failed() {
             return;
         }
+
+        self.pop_loop_status();
 
         let expr_idx = self.cur_ast_node_index();
 
@@ -1485,6 +1513,13 @@ impl Parser {
                     self.parse_do();
                 } else if name == "while" {
                     self.parse_while();
+                } else if name == "continue" {
+                    if self.is_in_loop() {
+                        self.ast.push(AstNode::Continue(self.index));
+                    } else {
+                        let (line, col) = self.cur_line_col();
+                        self.push_error(line, col, "ERROR: 'continue' is only allowed in loops".to_owned());
+                    }
                 } else {
                     let func_name:String = name.to_owned();
                     self.parse_func_call(func_name);

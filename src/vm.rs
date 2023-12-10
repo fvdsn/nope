@@ -24,6 +24,7 @@ use crate::{
         Instruction,
         GlobalsTable,
         LocalsTable,
+        LoopsTable,
     },
     gc::{
         Gc,
@@ -47,6 +48,7 @@ pub struct Vm {
     stdlib: Stdlib,
     globals: GlobalsTable,
     locals: LocalsTable,
+    loops: LoopsTable,
     chunk: Chunk,
     stack: Vec<Value>,
     ip: usize,
@@ -60,6 +62,7 @@ impl Vm {
             gc: Gc::new(),
             globals: GlobalsTable::new(),
             locals: LocalsTable::new(),
+            loops: LoopsTable::new(),
             stdlib: Stdlib::new(),
             config,
             chunk: Chunk::new(),
@@ -371,10 +374,14 @@ impl Vm {
                 self.chunk.write(node_idx, Instruction::Pop);
                 self.chunk.write(node_idx, Instruction::Pop);
 
+                self.loops.push_loop(self.locals.get_locals_count(), idx_001);
+
                 if !self.compile_node(ast, *expr_node_idx) {
-                    println!("error compiling true branch of if block");
+                    println!("error compiling while body");
                     return false;
                 }
+
+                self.loops.pop_loop();
 
                 self.chunk.write(node_idx, Instruction::Jump(0));
                 let jmp_to_001_idx = self.chunk.last_instr_idx();
@@ -388,6 +395,29 @@ impl Vm {
 
                 self.chunk.rewrite(jmp_to_001_idx, Instruction::Jump(
                     idx_001 as i64 - jmp_to_001_idx as i64
+                ));
+            },
+            AstNode::Continue(_) => {
+                if !self.loops.in_loop() {
+                    println!("error compiling 'continue', not in a loop");
+                    return false;
+                }
+
+                let cloop = self.loops.cur_loop();
+
+                println!("{:?}", cloop);
+
+                let lcount = self.locals.get_locals_count();
+
+                println!("lcount: {}", lcount);
+
+                let var_to_pop = lcount - cloop.locals_count;
+                for _ in 0..var_to_pop {
+                    self.chunk.write(node_idx, Instruction::Pop);
+                }
+                self.chunk.write(node_idx, Instruction::PushVoid);
+                self.chunk.write(node_idx, Instruction::Jump(
+                    cloop.continue_ip as i64 - (self.chunk.last_instr_idx() + 1) as i64
                 ));
             },
             AstNode::FunctionCall(_, name, args) => {

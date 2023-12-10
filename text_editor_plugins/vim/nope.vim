@@ -10,9 +10,9 @@
 " Quit when a syntax file was already loaded.
 if exists('b:current_syntax') | finish|  endif
 
-syntax keyword letsetvar let set var
+syntax keyword letsetvar let set var do
 syntax keyword cond if else
-syntax keyword repeat while
+syntax keyword repeat while continue
 
 syntax keyword stdlib random rand100 flip_coin d4 d6 d8 d10 d12 d20 d100
 syntax keyword stdlib num print echo neg return not bool floor ceil abs acos acosh decr incr sin sinh asin asinh cos cosh tan tanh atan atanh inv log2 log10 ln1p ln exp expm1 sqrt cbrt round fround trunc sign str upper lower trim shh bitstr read_text is_even is_odd

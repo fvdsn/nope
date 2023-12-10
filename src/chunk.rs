@@ -93,6 +93,40 @@ impl LocalsTable {
             }
         }
     }
+    pub fn get_locals_count(&self) -> usize {
+        return self.locals.len();
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub struct Loop {
+    pub locals_count: usize,
+    pub continue_ip: usize,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct LoopsTable {
+    loops: Vec<Loop>,
+}
+
+impl LoopsTable {
+    pub fn new() -> LoopsTable {
+        return LoopsTable {
+            loops: vec![],
+        };
+    }
+    pub fn push_loop(&mut self, locals_count: usize, continue_ip: usize) {
+        self.loops.push(Loop { locals_count, continue_ip });
+    }
+    pub fn pop_loop(&mut self) {
+        self.loops.pop();
+    }
+    pub fn in_loop(&self) -> bool {
+        return self.loops.len() > 0;
+    }
+    pub fn cur_loop(&self) -> Loop {
+        return self.loops[self.loops.len()-1];
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

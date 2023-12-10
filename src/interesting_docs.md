@@ -1,4 +1,4 @@
-Intersting Documentations and Resources
+Interesting Documentation and Resources
 =======================================
 
 ## Full Books
@@ -12,3 +12,7 @@ Intersting Documentations and Resources
 
 ## Rust
 - https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md
+
+## Vim Syntax
+- https://learnvimscriptthehardway.stevelosh.com/chapters/45.html
+- https://github.com/pangloss/vim-javascript/blob/master/syntax/javascript.vim
