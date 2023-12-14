@@ -916,7 +916,12 @@ impl Parser {
 
         if self.peek_equal() { // we accept an optional '='; "let x = 42" or "let x 42"
             self.nextt();
+        } else {
+            let (line, col) = self.peek_line_col();
+            self.push_error(line, col, "ERROR: expected '='".to_owned());
+            return;
         }
+
 
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
@@ -1170,6 +1175,10 @@ impl Parser {
 
                     if self.peek_equal() { // we accept an optional '='; "let x = 42" or "let x 42"
                         self.nextt();
+                    } else {
+                        let (vline, vcol) = self.peek_line_col();
+                        self.push_error(vline, vcol, "ERROR: expected '='".to_owned());
+                        return;
                     }
         
                     self.parse_expression(ExpressionMode::Single, Some(var_name));
@@ -2083,11 +2092,11 @@ mod tests {
 
     #[test]
     fn test_parse_basic_let() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 _"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
-            AstNode::Void(3),
+            AstNode::Number(3, 3.0),
+            AstNode::Void(4),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2095,12 +2104,12 @@ mod tests {
 
     #[test]
     fn test_parse_let_defines_const() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 x"));
         let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
-            AstNode::GlobalValueReference(3, "x".to_owned()),
+            AstNode::Number(3, 3.0),
+            AstNode::GlobalValueReference(4, "x".to_owned()),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
@@ -2112,12 +2121,12 @@ mod tests {
 
     #[test]
     fn test_parse_var_defines_var() {
-        let mut parser = Parser::new(CONFIG, String::from("var x 3 x"));
+        let mut parser = Parser::new(CONFIG, String::from("var x = 3 x"));
         let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
-            AstNode::GlobalValueReference(3, "x".to_owned()),
+            AstNode::Number(3, 3.0),
+            AstNode::GlobalValueReference(4, "x".to_owned()),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1)
         ]);
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
@@ -2141,12 +2150,12 @@ mod tests {
 
     #[test]
     fn test_parse_let_defines_local_var() {
-        let mut parser = Parser::new(CONFIG, String::from("(\nlet x 3\nx)"));
+        let mut parser = Parser::new(CONFIG, String::from("(\nlet x = 3\nx)"));
         let envsize = parser.env.size();
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(3, 3.0),
-            AstNode::LocalValueReference(4, "x".to_owned()),
+            AstNode::Number(4, 3.0),
+            AstNode::LocalValueReference(5, "x".to_owned()),
             AstNode::LocalLet(1, "x".to_owned(), 0, 1),
         ]);
         assert_eq!(None, parser.env.get_entry(&"x".to_owned()));
@@ -2156,7 +2165,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_double_global() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 let y = 4 _"));
         let envsize = parser.env.size();
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
@@ -2171,7 +2180,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_global_and_local() {
-        let mut parser = Parser::new(CONFIG, String::from("let x let y 3 _ _"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = let y = 3 _ _"));
         let envsize = parser.env.size();
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
@@ -2184,7 +2193,7 @@ mod tests {
 
     #[test]
     fn test_parse_let_global_and_local_if() {
-        let mut parser = Parser::new(CONFIG, String::from("let x = if true let y 3 _ else let z 4 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = if true let y = 3 _ else let z = 4 _"));
         let envsize = parser.env.size();
         parser.parse();
         let entry = parser.env.get_entry(&"x".to_owned()).unwrap();
@@ -2198,20 +2207,20 @@ mod tests {
 
     #[test]
     fn test_parse_let_wrong_var() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 y"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 y"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
+            AstNode::Number(3, 3.0),
         ]);
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_missing_expr() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0), 
+            AstNode::Number(3, 3.0), 
             AstNode::Void(0),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 1),
         ]);
@@ -2256,15 +2265,15 @@ mod tests {
 
     #[test]
     fn test_parse_chained_let() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 [x y]"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 let y = 4 [x y]"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
-            AstNode::Number(5, 4.0),
-            AstNode::GlobalValueReference(7, "x".to_owned()),
-            AstNode::GlobalValueReference(8, "y".to_owned()),
-            AstNode::Array(9, vec![2, 3]),
-            AstNode::GlobalLet(3, "y".to_owned(), 1, 4),
+            AstNode::Number(3, 3.0),
+            AstNode::Number(7, 4.0),
+            AstNode::GlobalValueReference(9, "x".to_owned()),
+            AstNode::GlobalValueReference(10, "y".to_owned()),
+            AstNode::Array(11, vec![2, 3]),
+            AstNode::GlobalLet(4, "y".to_owned(), 1, 4),
             AstNode::GlobalLet(0, "x".to_owned(), 0, 5)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2272,28 +2281,28 @@ mod tests {
 
     #[test]
     fn test_parse_chained_let_wrong_var() {
-        let mut parser = Parser::new(CONFIG, String::from("let x 3 let y 4 [x z]"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = 3 let y = 4 [x z]"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_diff_good_scope() {
-        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [y]] x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = [let y = 3 [y]] x"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_diff_wrong_scope() {
-        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [x y]] x"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = [let y = 3 [x y]] x"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_diff_wrong_scope2() {
-        let mut parser = Parser::new(CONFIG, String::from("let x [let y 3 [y]] y"));
+        let mut parser = Parser::new(CONFIG, String::from("let x = [let y = 3 [y]] y"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -2470,28 +2479,28 @@ mod tests {
 
     #[test]
     fn test_parse_let_func_scope() {
-        let mut parser = Parser::new(CONFIG, String::from("let f |a| a f 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let f = |a| a f 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_func_scope_bad() {
-        let mut parser = Parser::new(CONFIG, String::from("let f |a| a f a"));
+        let mut parser = Parser::new(CONFIG, String::from("let f = |a| a f a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_let_func_recursive() {
-        let mut parser = Parser::new(CONFIG, String::from("let f |a| f 3 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let f = |a| f 3 _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_let_func_recursive_p() {
-        let mut parser = Parser::new(CONFIG, String::from("let f |a| ( f 3 ) _"));
+        let mut parser = Parser::new(CONFIG, String::from("let f = |a| ( f 3 ) _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2728,13 +2737,13 @@ mod tests {
 
     #[test]
     fn test_parse_dynkey_var() {
-        let mut parser = Parser::new(CONFIG, String::from("let pi 3.14 [pi]12"));
+        let mut parser = Parser::new(CONFIG, String::from("let pi = 3.14 [pi]12"));
         parser.parse();
         assert_eq!(parser.ast, vec![
-           AstNode::Number(2, 3.14),
-           AstNode::GlobalValueReference(4, "pi".to_string()),
-           AstNode::Number(6, 12.0),
-           AstNode::DynamicKeyAccess(3, 1, 2),
+           AstNode::Number(3, 3.14),
+           AstNode::GlobalValueReference(5, "pi".to_string()),
+           AstNode::Number(7, 12.0),
+           AstNode::DynamicKeyAccess(4, 1, 2),
            AstNode::GlobalLet(0, "pi".to_string(), 0, 3)
         ]);
         assert_eq!(parser.state, ParserState::Done);
@@ -2857,7 +2866,7 @@ mod tests {
     #[test]
     fn test_parse_dont_redefine_void() {
         // _ must always stay a void value. assigning a value to it has no effect
-        let mut parser = Parser::new(CONFIG, String::from("let _ |a| true _"));
+        let mut parser = Parser::new(CONFIG, String::from("let _ = |a| true _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -2872,28 +2881,28 @@ mod tests {
 
     #[test]
     fn test_parse_no_commas() {
-        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1 2 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo = |a b c| _ foo 1 2 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_all_commas() {
-        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1, 2, 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo = |a b c| _ foo 1, 2, 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_missing_comma1() {
-        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1 2, 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo = |a b c| _ foo 1 2, 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_missing_comma2() {
-        let mut parser = Parser::new(CONFIG, String::from("let foo |a b c| _ foo 1, 2 3"));
+        let mut parser = Parser::new(CONFIG, String::from("let foo = |a b c| _ foo 1, 2 3"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
@@ -2914,44 +2923,44 @@ mod tests {
 
     #[test]
     fn test_parse_global_block_env_carry_over() {
-        let mut parser = Parser::new(CONFIG, String::from("let a 3 _\nprint a"));
+        let mut parser = Parser::new(CONFIG, String::from("let a = 3 _\nprint a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
         assert_eq!(parser.ast, vec![
-            AstNode::Number(2, 3.0),
-            AstNode::Void(3),
+            AstNode::Number(3, 3.0),
+            AstNode::Void(4),
             AstNode::GlobalLet(0, "a".to_owned(), 0, 1),
-            AstNode::GlobalValueReference(5, "a".to_owned()),
-            AstNode::FunctionCall(4, "print".to_owned(), vec![3]),
+            AstNode::GlobalValueReference(6, "a".to_owned()),
+            AstNode::FunctionCall(5, "print".to_owned(), vec![3]),
             AstNode::TopLevelBlock(0, vec![2, 4])
         ]);
     }
 
     #[test]
     fn test_parse_global_block_env_carry_over2() {
-        let mut parser = Parser::new(CONFIG, String::from("let a 3 let b 4 _\nadd a b"));
+        let mut parser = Parser::new(CONFIG, String::from("let a = 3 let b = 4 _\nadd a b"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
     }
 
     #[test]
     fn test_parse_global_block_env_carry_over_wrong() {
-        let mut parser = Parser::new(CONFIG, String::from("if true let a 3 _ print a"));
+        let mut parser = Parser::new(CONFIG, String::from("if true let a = 3 _ print a"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Error);
     }
 
     #[test]
     fn test_parse_local_let() {
-        let mut parser = Parser::new(CONFIG, String::from("let a | | let x 3 33 _"));
+        let mut parser = Parser::new(CONFIG, String::from("let a = | | let x = 3 33 _"));
         parser.parse();
         assert_eq!(parser.state, ParserState::Done);
         assert_eq!(parser.ast, vec![
-           AstNode::Number(6, 3.0),
-           AstNode::Number(7, 33.0),
-           AstNode::LocalLet(4, "x".to_owned(), 0, 1),
-           AstNode::FunctionDef(2, vec![], 2),
-           AstNode::Void(8),
+           AstNode::Number(8, 3.0),
+           AstNode::Number(9, 33.0),
+           AstNode::LocalLet(5, "x".to_owned(), 0, 1),
+           AstNode::FunctionDef(3, vec![], 2),
+           AstNode::Void(10),
            AstNode::GlobalLet(0, "a".to_owned(), 3, 4)
         ]);
     }
