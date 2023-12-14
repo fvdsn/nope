@@ -1,0 +1,2 @@
+# This oneliner prints 1000 gaussian distributed random numbers
+1000 *: let COUNT = 100, var i = 0, var acc = 0, loop if i > COUNT, break_as print acc else do set acc = acc + (random - 0.5) / COUNT, set i = i + 1

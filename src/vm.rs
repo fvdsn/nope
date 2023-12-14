@@ -572,6 +572,8 @@ impl Vm {
                     idx_002 as i64 - idx_00a as i64
                 ));
 
+                self.locals.push_anonymous();
+
                 if !self.compile_node(ast, *vexpr_node_idx) {
                     println!("error compiling value of *:");
                     return false;
@@ -591,10 +593,16 @@ impl Vm {
                     idx_007 as i64 - idx_006 as i64
                 ));
 
+                self.locals.push_anonymous();
+
                 if !self.compile_node(ast, *vexpr_node_idx) {
                     println!("error compiling value of *:");
                     return false;
                 }
+
+                self.locals.pop();
+                self.locals.pop();
+
                 self.chunk.write(node_idx, Instruction::Add);
                 self.chunk.write(node_idx, Instruction::Swap);
                 self.chunk.write(node_idx, Instruction::Decr);
