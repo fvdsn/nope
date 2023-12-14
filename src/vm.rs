@@ -73,7 +73,7 @@ impl Vm {
     }
 
     fn print_trace(&self) {
-        println!("{:<24} {:?}", format!("{:?}", self.chunk.code[self.ip]), self.stack);
+        println!("{:<4} {:<24} {:?}", self.ip, format!("{:?}", self.chunk.code[self.ip]), self.stack);
     }
 
     pub fn get_copy_of_last_env(&self) -> Option<Env> {
@@ -198,7 +198,7 @@ impl Vm {
 
         self.parsers.push(parser);
 
-        if self.config.debug {
+        if self.config.debug || self.config.trace {
             self.chunk.pretty_print();
             println!("run...\n");
         }
@@ -360,6 +360,11 @@ impl Vm {
             },
             AstNode::WhileLoop(_, cond_expr_node_idx, expr_node_idx) => {
 
+                self.chunk.write(node_idx, Instruction::Jump(2));
+                self.chunk.write(node_idx, Instruction::Jump(0));
+
+                let break_idx = self.chunk.last_instr_idx();
+
                 self.chunk.write(node_idx, Instruction::PushVoid);
 
                 let idx_001 = self.chunk.last_instr_idx() + 1;
@@ -374,7 +379,7 @@ impl Vm {
                 self.chunk.write(node_idx, Instruction::Pop);
                 self.chunk.write(node_idx, Instruction::Pop);
 
-                self.loops.push_loop(self.locals.get_locals_count(), idx_001);
+                self.loops.push_loop(self.locals.get_locals_count(), idx_001, break_idx);
 
                 if !self.compile_node(ast, *expr_node_idx) {
                     println!("error compiling while body");
@@ -388,6 +393,10 @@ impl Vm {
 
                 self.chunk.write(node_idx, Instruction::Pop);
                 let idx_999 = self.chunk.last_instr_idx();
+
+                self.chunk.rewrite(break_idx, Instruction::Jump(
+                    (idx_999 + 1) as i64 - break_idx as i64
+                ));
 
                 self.chunk.rewrite(jmp_to_999_idx, Instruction::JumpIfFalse(
                     idx_999 as i64 - jmp_to_999_idx as i64
@@ -405,11 +414,7 @@ impl Vm {
 
                 let cloop = self.loops.cur_loop();
 
-                println!("{:?}", cloop);
-
                 let lcount = self.locals.get_locals_count();
-
-                println!("lcount: {}", lcount);
 
                 let var_to_pop = lcount - cloop.locals_count;
                 for _ in 0..var_to_pop {
@@ -418,6 +423,28 @@ impl Vm {
                 self.chunk.write(node_idx, Instruction::PushVoid);
                 self.chunk.write(node_idx, Instruction::Jump(
                     cloop.continue_ip as i64 - (self.chunk.last_instr_idx() + 1) as i64
+                ));
+            },
+            AstNode::Break(_, expr_node_idx) => {
+                if !self.loops.in_loop() {
+                    println!("error compiling 'break', not in a loop");
+                    return false;
+                }
+
+                let cloop = self.loops.cur_loop();
+
+                let lcount = self.locals.get_locals_count();
+
+                let var_to_pop = lcount - cloop.locals_count;
+                for _ in 0..var_to_pop {
+                    self.chunk.write(node_idx, Instruction::Pop);
+                }
+                if !self.compile_node(ast, *expr_node_idx) {
+                    println!("error compiling break value");
+                    return false;
+                }
+                self.chunk.write(node_idx, Instruction::Jump(
+                    cloop.break_ip as i64 - (self.chunk.last_instr_idx() + 1) as i64
                 ));
             },
             AstNode::FunctionCall(_, name, args) => {

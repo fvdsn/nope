@@ -102,6 +102,7 @@ impl LocalsTable {
 pub struct Loop {
     pub locals_count: usize,
     pub continue_ip: usize,
+    pub break_ip: usize,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -115,8 +116,8 @@ impl LoopsTable {
             loops: vec![],
         };
     }
-    pub fn push_loop(&mut self, locals_count: usize, continue_ip: usize) {
-        self.loops.push(Loop { locals_count, continue_ip });
+    pub fn push_loop(&mut self, locals_count: usize, continue_ip: usize, break_ip: usize) {
+        self.loops.push(Loop { locals_count, continue_ip, break_ip });
     }
     pub fn pop_loop(&mut self) {
         self.loops.pop();

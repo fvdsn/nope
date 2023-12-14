@@ -131,6 +131,7 @@ pub enum AstNode {
     TopLevelBlock(usize, Vec<usize>), //Vec<usize> is the expressions, 
     WhileLoop(usize, usize, usize), // while $cond $expr
     Continue(usize),
+    Break(usize, usize),
 }
 
 #[derive(PartialEq, Debug)]
@@ -300,6 +301,10 @@ impl Parser {
             AstNode::WhileLoop(_, cond, expr) => {
                 println!("{}while", " ".repeat(original_indent));
                 self._pretty_print_ast(*cond, indent + 2, false);
+                self._pretty_print_ast(*expr, indent + 2, false);
+            }
+            AstNode::Break(_, expr) => {
+                println!("{}break", " ".repeat(original_indent));
                 self._pretty_print_ast(*expr, indent + 2, false);
             }
             AstNode::FunctionDef(_, args, expr_body) => {
@@ -1045,6 +1050,31 @@ impl Parser {
         self.ast.push(AstNode::WhileLoop(while_idx, cond_idx, expr_idx));
     }
 
+    fn parse_break(&mut self) {
+        let (line, col) = self.peek_line_col();
+
+        if !self.is_in_loop() {
+            self.push_error(line, col, "ERROR: 'break' is only allowed in loops".to_owned());
+            return
+        }
+
+        if self.peek_closing_element() {
+            self.push_incomplete(line, col, "ERROR: expected break value after 'break'".to_owned());
+            return;
+        }
+
+        let break_idx = self.index;
+
+        self.parse_expression(ExpressionMode::Single, None);
+        if self.parsing_failed() {
+            return;
+        }
+
+        let expr_idx = self.cur_ast_node_index();
+
+        self.ast.push(AstNode::Break(break_idx, expr_idx));
+    }
+
     fn parse_let(&mut self, mode: ExpressionMode, is_const: bool) {
         let global_scope: bool = matches!(mode, ExpressionMode::TopLevel);
 
@@ -1513,6 +1543,8 @@ impl Parser {
                     self.parse_do();
                 } else if name == "while" {
                     self.parse_while();
+                } else if name == "break" {
+                    self.parse_break();
                 } else if name == "continue" {
                     if self.is_in_loop() {
                         self.ast.push(AstNode::Continue(self.index));
