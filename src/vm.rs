@@ -265,11 +265,13 @@ impl Vm {
             AstNode::GlobalLet(_, name, value_expr_node_idx, next_expr_node_idx) => {
                 let name_ref = self.gc.intern(name.to_owned());
                 let name_cst_idx = self.chunk.write_constant(node_idx, Value::String(name_ref));
+                self.locals.push_anonymous();
                 if !self.compile_node(ast, *value_expr_node_idx) {
                     println!("error compiling expression value for global variable {}", name);
                     return false;
                 }
                 self.chunk.write(node_idx, Instruction::DefineGlobal(name_cst_idx));
+                self.locals.pop();
                 if !self.compile_node(ast, *next_expr_node_idx) {
                     println!("error compile continuation expression for global variable {}", name);
                     return false;

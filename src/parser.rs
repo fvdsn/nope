@@ -952,6 +952,10 @@ impl Parser {
         }
         let expr1_idx = self.cur_ast_node_index();
 
+        if self.peek_comma() { // we accept an optional ','; "do A(), B()"
+            self.nextt();
+        }
+
         if self.peek_rightp() {
             self.ast.push(AstNode::Void(do_idx));
         } else if self.peek_closing_element() {
@@ -982,6 +986,11 @@ impl Parser {
             return;
         }
         let cond_idx = self.cur_ast_node_index();
+
+        if self.peek_comma() { // we accept an optional ','; "if x == 42, 99 else 32"
+            self.nextt();
+        }
+
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_info(line, col, "this if is missing an expression".to_owned());
@@ -1029,6 +1038,11 @@ impl Parser {
             return;
         }
         let cond_idx = self.cur_ast_node_index();
+        
+        if self.peek_comma() { // we accept an optional ','; "while i < 10, set i = print i + 1"
+            self.nextt();
+        }
+
         if self.peek_closing_element() {
             let (eline, ecol) = self.peek_line_col();
             self.push_info(line, col, "this while is missing an expression".to_owned());
@@ -1180,6 +1194,10 @@ impl Parser {
                             self.env.push_value_entry(var_name.clone(), global_scope, is_const);
                         }
                     };
+
+                    if self.peek_comma() { // we accept an optional ','; "let x = 42, ..."
+                        self.nextt();
+                    }
 
                     if !self.peek_closing_element() {
                         match mode {

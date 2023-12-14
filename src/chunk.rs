@@ -68,6 +68,9 @@ impl LocalsTable {
             locals: vec![],
         };
     }
+    pub fn push_anonymous(&mut self) {
+        self.add_local("".to_owned())
+    }
     pub fn add_local(&mut self, name: String) {
         self.locals.push(Local {depth: self.locals.len(), name: name.to_owned()});
     }
