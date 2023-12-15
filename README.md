@@ -14,7 +14,6 @@ Nope is a scripting programming language, optimised for small and fun programs
  - Built with Rust
  - Will include a fully featured stdlib
  - Will have an eventloop concurrency model
- - Will be reasonably fast
 
 ![a screenshot of nope, see samples/fizzbuzz2.nope](samples/fizzbuzz_screenshot.png)
 
@@ -63,6 +62,72 @@ Or run a script with
 
 
 ## Nope Basics
+
+### Basic types
+
+The following table should give you an idea of the basic types and allowed data models. Keep in mind arrays and objects are not
+implemented at the moment
+
+``` 
+[
+    null: null,
+    void: [void _ ()]
+    bool: [true false]
+    num:  [0 1 99 3.14 -1_000_000 0xdead 0b10101 NaN Inf PI]
+    string: ['foo' "bar" ~hello]
+    arrays: [1 2 true null []]
+    dicts:  {key:32 val:99}
+    mixed:  ['foo' key:'value']
+]
+```
+All data in nope is a combination of the above types and structures.
+
+
+### Basic code structure
+
+Let's look at very basic program.
+
+```
+let x = d6() + d6()
+var winning = false
+
+if x >= 10 (
+    set winning = true
+    print 'WINNER'
+) else (
+    print 'LOSER'
+)
+
+```
+
+In the first line, we define a variable called `x`, with an initial value defined
+by an expression which calls two functions 'd6' and adds the results. The variable
+'x' is available in all subsequent expressions in the current scope. Since it
+is defined with `let`, it cannot later be changed with `set`.
+
+In the second line we declare another variable, but this time it can be modified.
+
+We then evaluate a classic if-else conditional. Note that unlike other languages,
+the code blocks are not defined by `{`/`}` but by parenthesis. 
+
+
+- - - 
+
+
+The two keywords `var` and `let` allow you to define variables. Only the variables
+defined with 'var' can be later changed.
+
+```
+let foo = 32
+var bar = false
+```
+
+Variables are syntaxically scoped; they are only available in the expression following
+the declaration.
+
+
+
+
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
 
