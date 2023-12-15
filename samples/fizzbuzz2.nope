@@ -1,7 +1,5 @@
 
-# This is FizzBuzz 'nope' style bitchez
-
-
+# Fizzbuzz
 var i = 1, while i <= 100 (
     let divby3 = i % 3 == 0
     let divby5 = i % 5 == 0
