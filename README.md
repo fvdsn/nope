@@ -18,7 +18,7 @@ Nope is a scripting programming language, optimised for small and fun programs
 
 ### Fizzbuzz looks like this:
 
-```
+```js
 # Fizzbuzz
 var i = 1, while i <= 100 (
     let divby3 = i % 3 == 0
