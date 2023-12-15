@@ -1,14 +1,91 @@
 # The Nope Script
 
+Nope is a scripting programming language, optimised for small and fun programs
+
+Nope is
+ - Fun
+ - Expression based
+ - Garbage collected
+ - Imperative with a sprinkle of functional
+ - Focused on solving practical problems
+ - Separates data from logic
+ - Can represent JSON and XML natively
+ - A single binary
+ - Built with Rust
+ - Will include a fully featured stdlib
+ - Will have an eventloop concurrency model
+ - Will be reasonably fast
+
+Fizzbuzz looks like this:
+
+```
+# Fizzbuzz
+var i = 1, while i <= 100 (
+    let divby3 = i % 3 == 0
+    let divby5 = i % 5 == 0
+
+    if divby5 && divby3 (
+        print 'FizzBuzz'
+    ) else if divby3 (
+        print 'Fizz'
+    ) else if divby5 (
+        print 'Buzz'
+    ) else (
+        print i
+    )
+
+    set i = i + 1
+)
+```
+
+
+
+
+## Run and Install
+
+Install rust, clone the repository and then
+
+> cargo install --path .
+
+You can then launch the interactive repl with
+
+> nope
+
+Or run a script with
+
+> nope myscript.nope
+
+
+## Roadmap
+
 > This is project is currently at a very very early stage
-> - [x] tokenizer
-> - [x] parsing data
-> - [x] parsing a full program
-> - [ ] evaluate basic expressions
->   - [x] evaluate numbers, print, add, sub, mult, div, neg
->   - [ ] ...
-> - [ ] evaluate function declarations
-> - [ ] initial stdlib
+> - [x] evaluate expressions
+> - [x] global, local variables and scopes
+> - [x] constant & operators
+> - [x] math stdlib
+> - [x] loops
+> - [ ] functions
+> - [ ] dictionaries and arrays
+> - [ ] garbage collector
+> - [ ] errors, try catch
+> - [ ] string stdlib
+> - [ ] parsing & serialization
+> - [ ] utils stdlib
+> - [ ] resource type
+> - [ ] os stdlib
+> - [ ] unit tests
+> - [ ] v1.0
+> - [ ] async
+> - [ ] async stdlib
+> - [ ] v2.0
+> - [ ] web server
+> - [ ] v3.0
+> - [ ] modules & packages
+> - [ ] v4.0
+> - [ ] perf
+
+
+## Nope Basics
 
 Nope is lisp without the parenthesis, a programming language optimised for fun, small useful scripts, and repl oriented development
 
