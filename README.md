@@ -18,28 +18,7 @@ Nope is a scripting programming language, optimised for small and fun programs
 
 ### Fizzbuzz looks like this:
 
-```js
-# Fizzbuzz
-var i = 1, while i <= 100 (
-    let divby3 = i % 3 == 0
-    let divby5 = i % 5 == 0
-
-    if divby5 && divby3 (
-        print 'FizzBuzz'
-    ) else if divby3 (
-        print 'Fizz'
-    ) else if divby5 (
-        print 'Buzz'
-    ) else (
-        print i
-    )
-
-    set i = i + 1
-)
-```
-
-
-
+![a screenshot of nope, see samples/fizzbuzz2.nope](samples/fizzbuzz2.nope)
 
 ## Run and Install
 
