@@ -2,7 +2,7 @@
 
 Nope is a scripting programming language, optimised for small and fun programs
 
-Nope is
+### Nope is
  - Fun
  - Expression based
  - Garbage collected
