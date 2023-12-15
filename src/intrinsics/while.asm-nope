@@ -1,0 +1,13 @@
+while(cond, expr)
+
+00A: jump(000)
+00B: jump(001)
+000: push_void()            # retv (void)
+001: cond()                 # retv, condv
+002: jump_if_false(999)     # retv, condv
+003: pop()                  # retv,
+004: pop()                  #
+005: expr()                 # retv (exprv)
+006: jump(001)              # retv (exprv)
+
+999: pop()                  # retv
