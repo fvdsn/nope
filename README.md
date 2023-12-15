@@ -18,7 +18,7 @@ Nope is a scripting programming language, optimised for small and fun programs
 
 ### Fizzbuzz looks like this:
 
-![a screenshot of nope, see samples/fizzbuzz2.nope](samples/fizzbuzz2.nope)
+![a screenshot of nope, see samples/fizzbuzz2.nope](samples/fizzbuzz_screenshot.png)
 
 ## Run and Install
 
