@@ -93,9 +93,9 @@ var winning = false
 
 if x >= 10 (
     set winning = true
-    print 'WINNER'
+    print 'haha, yes! :)'
 ) else (
-    print 'LOSER'
+    print 'oh no :('
 )
 
 ```
@@ -108,7 +108,33 @@ is defined with `let`, it cannot later be changed with `set`.
 In the second line we declare another variable, but this time it can be modified.
 
 We then evaluate a classic if-else conditional. Note that unlike other languages,
-the code blocks are not defined by `{`/`}` but by parenthesis. 
+the code blocks are not defined by curly braces `{`/`}` but by parenthesis `(`/`)`. 
+The reason is that nope is an expression based language, so very nope construct is
+an expression that produces a value.
+
+The following example puts those principles in action
+
+```
+let res = if flip_coin(), "heads" else "tails"
+```
+
+The `if` returns a value, which depending on the result of `flip_coin()` will be
+either the string "heads" or "tails". 
+
+You can surround expressions with parenthesis, and you can also surround multiple
+expressions with parenthesis. In the later case, all expressions are evaluated in
+order, but only the last expression produces a value.
+
+This is what we've used to both change the variable `winning` with the `set winning = true`
+expression, but also to print a message.
+
+Note as well that the print expression `print "hey"` ommits parenthesis around its argument
+This is not a special case of the print function. In nope, all parenthesis and commas for
+functions arguments are optional.
+
+```
+let clamped_0_100 = max 0 min value 100
+```
 
 
 - - - 
