@@ -61,9 +61,7 @@ Or run a script with
 > - [ ] perf
 
 
-## Nope Basics
-
-### Basic types
+## Types
 
 The following table should give you an idea of the basic types and allowed data models. Keep in mind arrays and objects are not
 implemented at the moment
@@ -84,7 +82,7 @@ All data in nope is a combination of the above types and structures.
 
 Note that numbers are 64bit floats, and the strings are unicode.
 
-### Basic code structure
+## Code structure
 
 Let's look at basic nope program.
 
@@ -175,7 +173,7 @@ read_text 'file.txt' -> upper -> write_txt 'file2.txt'
 
 
 
-### Operators
+## Operators
 
 #### Equality `==`, `!=`
 
@@ -231,7 +229,7 @@ print(3 *: d6)
 Note that the first operand is first converted to a number. If the number is zero or negative, we return `void`.
 
 
-### Loops
+## Loops
 
 Nope supports two looping mechanism, `loop` which endlessly repeats the expression that follows and `while`,
 which evaluates a condition and repeats the next expression as long as the condition stays truthy.
@@ -267,7 +265,7 @@ var i = 0, let res = loop (
 )
 ```
 
-### Printing to the terminal
+## Printing to the terminal
 
 `print` and `echo` are similar functions, they take one argument, print the value to the terminal, and returns it. The difference is that `print` prints the raw string converted value, while `echo` prints a colored internal representation of the value.
 
@@ -281,7 +279,13 @@ var i = 0, while i < 10 (
 )
 ```
 
-### Arithmetic Functions and constants
+## Types check & conversions
+
+The following functions convert to their type, `num`, `bool`, `str`
+
+The following function test the types: `is_void`, `is_null`, `is_bool`, `is_num`, `is_int`, `is_nan`, `is_odd`, `is_even`, `is_str`
+
+## Arithmetic Functions and constants
 
 Nope supports the following arithmetic functions
 
@@ -291,8 +295,15 @@ And the following arithemtic constants
 
 - `NaN`, `Inf`, `PI`, `E`, `SQRT_2`, `SQRT_2PI`, `LN_2`, `LN_10`, `LOG2_10`, `LOG2_E`, `LOG10_2`, `LOG10_E`, `PHI`, `TAU`, `EPISLON`, `MAX|MIN_INT` `MAX|MIN_F64`, `MAX|MIN_I32|16|8`, `MAX_U32|16|8`
 
+## Strings
 
-### Randomness
+- `len` returns the length of the string
+- `upper`, `lower` transform the case of the string
+- `trim` removes the whitespace at the beginning and end of the string
+- `replace(from, to, text)` replaces the instances of `from` in `text` to `to`
+- `bitstr` transforms a number to its bitwise representation as a string
+
+## Randomness
 
 Nope supports the following rng functions
 
@@ -301,7 +312,7 @@ Nope supports the following rng functions
 If you want to return the sum of 3 dice throws it is better to use the repeat operator `3*:d6`
 
 
-### Units
+## Units
 
 Nope allows you to annotate number literal with a unit suffix.
 
@@ -329,8 +340,3 @@ It is also possible to convert from one unit to another at runtime with the `fro
 let area_sqin = to_unit 'sqin' <- from_unit 'ha' <- 50
 ```
 
-### Types check & conversions
-
-The following functions convert to their type, `num`, `bool`, `str`
-
-The following function test the types: `is_void`, `is_null`, `is_bool`, `is_num`, `is_int`, `is_nan`, `is_odd`, `is_even`, `is_str`
