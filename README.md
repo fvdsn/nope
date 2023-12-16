@@ -82,10 +82,11 @@ implemented at the moment
 ```
 All data in nope is a combination of the above types and structures.
 
+Note that numbers are 64bit floats, and the strings are unicode.
 
 ### Basic code structure
 
-Let's look at very basic program.
+Let's look at basic nope program.
 
 ```
 let x = d6() + d6()
@@ -109,7 +110,7 @@ In the second line we declare another variable, but this time it can be modified
 
 We then evaluate a classic if-else conditional. Note that unlike other languages,
 the code blocks are not defined by curly braces `{`/`}` but by parenthesis `(`/`)`. 
-The reason is that nope is an expression based language, so very nope construct is
+The reason is that nope is an expression based language, so every nope construct is
 an expression that produces a value.
 
 The following example puts those principles in action
@@ -141,6 +142,31 @@ This is also applies to functions without parameters
 ```
 let score = d6 + d6 + d6
 ```
+
+Note that function application has the highest precedence so `print 1 + 1` prints `1`
+since the addition is performed afterwards. This is not always what you want. One way
+is to put the parenthesis like this, `print(1 + 1)`. Or like this `print (1+1)`. Note
+that the space between the function name and the first parenthesis is meaningful. Without
+space, the full list of arguments is expected, while with the space, it's just parenthesis
+around a single argument; `max(1,2)` / `max (1) (2)`
+
+Another way is to use the left arrow `<-` operator. This operator simply evaluates the complete expression
+on the right. So you can do your print like this `print <- 1 + 1`.
+
+By convention, all functions in nope take the data they operate on as the last argument.
+
+```
+let txt = read_text 'file.txt'
+let txt2 = upper txt
+write_txt 'file2.txt' txt2
+```
+
+With the help of the left arrow `<-` operator you could have instead written the program like this:
+
+```
+write_txt 'file2.txt' <- upper <- read_text 'file.txt'
+```
+
 
 ### Operators
 
@@ -194,6 +220,8 @@ For example, this will throw the dice 3 times
 ```
 print(3 *: d6)
 ```
+
+Note that the first operand is first converted to a number. If the number is zero or negative, we return `void`.
 
 ### Arithmetic Functions and constants
 
