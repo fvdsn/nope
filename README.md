@@ -176,6 +176,7 @@ The boolean equivalent of an operand is
  - `false` if `null`, `void` or `0`
  - `true` otherwise
 
+The operators
 - `!` negates the boolean equivalent
 - `&&` returns the first operand if falsy, otherwise the second
 - `||` returns the first operand if truthy, otherwise the second
@@ -193,6 +194,19 @@ For example, this will throw the dice 3 times
 ```
 print(3 *: d6)
 ```
+
+## Arithmetic Functions and constants
+
+Nope supports the following arithmetic functions
+
+- `floor`, `ceil`, `abs`, `acos`, `acosh`, `sin`, `sinh`, `asin`, `asinh`, `cos`, `cosh`, `tan`, `tanh`, `atan`, `atanh`, `inv` `log2`, `log10`, `ln`, `ln1p`, `exp`, `expm1`, `sqrt`, `cbrt`, `round`, `fround`, `trunc`, `sign`, `max`, `min`, `pow`, `atan2`
+
+And the following arithemtic constants
+
+- `NaN`, `Inf`, `PI`, `E`, `SQRT_2`, `SQRT_2PI`, `LN_2`, `LN_10`, `LOG2_10`, `LOG2_E`, `LOG10_2`, `LOG10_E`, `PHI`, `TAU`, `EPISLON`, `MAX|MIN_INT` `MAX|MIN_F64`, `MAX|MIN_I32|16|8`, `MAX_U32|16|8`
+
+
+## Units
 
 
 
