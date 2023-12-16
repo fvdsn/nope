@@ -145,7 +145,7 @@ let score = d6 + d6 + d6
 
 Note that function application has the highest precedence so `print 1 + 1` prints `1`
 since the addition is performed afterwards. This is not always what you want. One way
-is to put the parenthesis like this, `print(1 + 1)`. Or like this `print (1+1)`. Note
+is to use parenthesis `print(1 + 1)`, `print (1 + 1)`. Note
 that the space between the function name and the first parenthesis is meaningful. Without
 space, the full list of arguments is expected, while with the space, it's just parenthesis
 around a single argument; `max(1,2)` / `max (1) (2)`
@@ -161,13 +161,13 @@ let txt2 = upper txt
 write_txt 'file2.txt' txt2
 ```
 
-With the help of the left arrow `<-` operator you could have instead written the program like this:
+With the help of the left arrow `<-` operator you could have instead written the following,
 
 ```
 write_txt 'file2.txt' <- upper <- read_text 'file.txt'
 ```
 
-The right arrow `->` operator (not yet implemented) does the same but the other way around, and allows to write the following
+The right arrow `->` operator (not yet implemented) does the same but the other way around.
 
 ```
 read_text 'file.txt' -> upper -> write_txt 'file2.txt'
@@ -230,6 +230,43 @@ print(3 *: d6)
 
 Note that the first operand is first converted to a number. If the number is zero or negative, we return `void`.
 
+
+### Loops
+
+Nope supports two looping mechanism, `loop` which endlessly repeats the expression that follows and `while`,
+which evaluates a condition and repeats the next expression as long as the condition stays truthy.
+
+```
+var i = 0, while i < 10 (
+    set i = print i + 1
+)
+```
+
+`continue` will jump directly to the next iteration, and `break` will stop the iteration
+
+```
+var i = 0, loop (
+    if i < 10 (
+        set i = i + 1
+        continue
+    )
+    break
+)
+```
+
+loops are expression too and return the last value of their expression. `break` returns void, `break_as` will break
+and return the next expression
+
+```
+var i = 0, let res = loop (
+    if i < 10 (
+        set i = i + 1
+    ) else (
+        break_as 'done!'
+    )
+)
+```
+
 ### Arithmetic Functions and constants
 
 Nope supports the following arithmetic functions
@@ -242,7 +279,7 @@ And the following arithemtic constants
 
 ### Printing to the terminal
 
-`print` and `echo` are similar functions, they take one argument, print their value to the terminal, and returns that value. The difference is that `print` prints the raw string converted value, while `echo` prints a colored internal representation of the value.
+`print` and `echo` are similar functions, they take one argument, print the value to the terminal, and returns it. The difference is that `print` prints the raw string converted value, while `echo` prints a colored internal representation of the value.
 
 In the repl, each submission is echoed after execution.
 
