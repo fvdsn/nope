@@ -240,14 +240,42 @@ And the following arithemtic constants
 
 - `NaN`, `Inf`, `PI`, `E`, `SQRT_2`, `SQRT_2PI`, `LN_2`, `LN_10`, `LOG2_10`, `LOG2_E`, `LOG10_2`, `LOG10_E`, `PHI`, `TAU`, `EPISLON`, `MAX|MIN_INT` `MAX|MIN_F64`, `MAX|MIN_I32|16|8`, `MAX_U32|16|8`
 
+### Randomness
+
+Nope supports the following rng functions
+
+- `random`, `flip_coin`, `rand100`, `d4`, `d6`, `d8`, `d10`, `d12`, `d20`, `d100`
+
+If you want to return the sum of 3 dice throws it is better to use the repeat operator `3*:d6`
+
 
 ### Units
 
+Nope allows you to annotate number literal with a unit suffix.
 
+```
+let distance = cos 45deg * (10Km + 3miles + 5yd + 3in + 5cm)
+```
 
+The units convert the number to their SI units equivalent. For example all distances are converted to meters.
 
+The information about the unit of a number is not kept at runtime. Units are nothing more than a convenient syntax trick.
 
+The following units are supported:
 
+`pi`, `tau`, `phi`, `GT`, `MT`, `kT`, `T`, `kg`, `g`, `mg`, `ug`, `ng`, `Ti`, `Gi`, `Mi`, `ki`, `d`, 
+`h`, `min`, `s`, `ms`, `us`, `ns`, `moon`, `deg`, `rad`, `in`, `km`, `m`, `dm`, `cm`, `mm`, `um`, `nm`, 
+`lb`, `oz`, `mile`, `miles`, `ft`, `yd`, `F`, `C`, `K`, `m3`, `l`, `dm3`, `dl`, `cl`, `ml`, `cm3`, 
+`barrel`, `cuft`, `ft3`, `gal`, `pint`, `cuin`, `in3`, `cuyd`, `yd3`, `m2`, `dm2`, `cm2`, `mm2`, `a`, 
+`ha`, `km2`, `mile2`, `yd2`, `sqyd`, `ft2`, `sqft`, `in2`, `sqin`, `belgium`, `footballfield`, `TiB`, 
+`TB`, `GiB`, `GB`, `MiB`, `MB`, `KiB`, `KB`, `million`, `billion`, `trillion`, `quadrillon`, `milli`, 
+`thousandth`, `micro`, `nano`, `pico`, 
+
+It is also possible to convert from one unit to another at runtime with the `from_unit` and `to_unit` functions.
+
+```
+let area_sqin = to_unit 'sqin' <- from_unit 'ha' <- 50
+```
 
 - - - 
 
