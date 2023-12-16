@@ -240,6 +240,20 @@ And the following arithemtic constants
 
 - `NaN`, `Inf`, `PI`, `E`, `SQRT_2`, `SQRT_2PI`, `LN_2`, `LN_10`, `LOG2_10`, `LOG2_E`, `LOG10_2`, `LOG10_E`, `PHI`, `TAU`, `EPISLON`, `MAX|MIN_INT` `MAX|MIN_F64`, `MAX|MIN_I32|16|8`, `MAX_U32|16|8`
 
+### Printing to the terminal
+
+`print` and `echo` are similar functions, they take one argument, print their value to the terminal, and returns that value. The difference is that `print` prints the raw string converted value, while `echo` prints a colored internal representation of the value.
+
+In the repl, each submission is echoed after execution.
+
+Note that since both `print` and `echo` return their argument, you can use them inside expressions to display temporary values.
+
+```
+var i = 0, while i < 10 (
+    set x = print x + 1
+)
+```
+
 ### Randomness
 
 Nope supports the following rng functions
