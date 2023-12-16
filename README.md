@@ -167,6 +167,13 @@ With the help of the left arrow `<-` operator you could have instead written the
 write_txt 'file2.txt' <- upper <- read_text 'file.txt'
 ```
 
+The right arrow `->` operator (not yet implemented) does the same but the other way around, and allows to write the following
+
+```
+read_text 'file.txt' -> upper -> write_txt 'file2.txt'
+```
+
+
 
 ### Operators
 
