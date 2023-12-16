@@ -195,7 +195,7 @@ For example, this will throw the dice 3 times
 print(3 *: d6)
 ```
 
-## Arithmetic Functions and constants
+### Arithmetic Functions and constants
 
 Nope supports the following arithmetic functions
 
@@ -206,7 +206,7 @@ And the following arithemtic constants
 - `NaN`, `Inf`, `PI`, `E`, `SQRT_2`, `SQRT_2PI`, `LN_2`, `LN_10`, `LOG2_10`, `LOG2_E`, `LOG10_2`, `LOG10_E`, `PHI`, `TAU`, `EPISLON`, `MAX|MIN_INT` `MAX|MIN_F64`, `MAX|MIN_I32|16|8`, `MAX_U32|16|8`
 
 
-## Units
+### Units
 
 
 
