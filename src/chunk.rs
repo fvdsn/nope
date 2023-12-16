@@ -171,6 +171,7 @@ pub enum Instruction {
     Print,
     Echo,
     Num,
+    ParseNum,
     Not,
     Bool,
     Equal,

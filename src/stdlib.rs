@@ -66,7 +66,7 @@ impl Stdlib {
             });
         };
 
-        def_one_arg("num",    vec![Instruction::Num]);
+        def_one_arg("num",    vec![Instruction::ParseNum]);
         def_one_arg("print",  vec![Instruction::Print]);
         def_one_arg("echo",   vec![Instruction::Echo]);
         def_one_arg("neg",    vec![Instruction::Negate]);

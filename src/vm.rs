@@ -823,6 +823,25 @@ impl Vm {
                     let val = self.pop();
                     self.push(Value::Num(val.num_equiv()));
                 },
+                Instruction::ParseNum => {
+                    let val = self.pop();
+                    match val {
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(ref_val);
+                            match str_val.parse::<f64>() {
+                                Ok(num) => {
+                                    self.push(Value::Num(num))
+                                },
+                                Err(_) => {
+                                    self.push(Value::Num(f64::NAN))
+                                }
+                            }
+                        },
+                        _ => {
+                            self.push(Value::Num(val.num_equiv()));
+                        }
+                    }
+                },
                 Instruction::Swap => {
                     let val1 = self.pop();
                     let val2 = self.pop();
