@@ -136,6 +136,17 @@ functions arguments are optional.
 let clamped_0_100 = max 0 min value 100
 ```
 
+This is also applies to functions without parameters
+
+```
+let score = d6 + d6 + d6
+```
+
+### Operators
+
+
+
+
 
 - - - 
 
