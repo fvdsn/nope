@@ -144,6 +144,58 @@ let score = d6 + d6 + d6
 
 ### Operators
 
+#### Equality `==`, `!=`
+
+Check that the operands are of the same type, and if that's the case compare their values or references
+
+#### Comparison `<`, `>`, `<=`, `>=`
+
+First converts the number to their number equivalent (NaN for strings and arrays) then compares
+
+The `+-=`and `!+-=` compare numbers for equality up to `EPSILON` precision
+
+#### Arithmetic `+`, `-`, `*`, `/`, `%`, `**`, 
+
+The usual math operations. Operands are converted to their number equivalent (NaN for string)
+
+Addition `+` of a string will perform string concatenation, and convert the other operand to string
+
+#### Integer & Bitwise Arithmetic
+
+All the arithmetic operators prefixed with `~` will first convert operands to int32 then perform the integer arithmetic operation.
+
+For example `10 ~/ 4` is `2`
+
+The bitwise operators `~!`, `~|`, `~&`, `~^`, `~<<`, `~>>`, `~>>>`
+convert the operands to int32 then perform the bitwise operations
+
+
+#### Boolean `!`, `||`, `&&`
+
+The boolean equivalent of an operand is
+ - `false` if `null`, `void` or `0`
+ - `true` otherwise
+
+- `!` negates the boolean equivalent
+- `&&` returns the first operand if falsy, otherwise the second
+- `||` returns the first operand if truthy, otherwise the second
+
+#### Default `??`
+
+Will return the second operand if the first is `null` or `void` otherwise the first
+
+#### Repeat `*:`
+
+The repeat operator will evaluate and sum the second operand N times, where N is the first operand. 
+
+For example, this will throw the dice 3 times
+
+```
+print(3 *: d6)
+```
+
+
+
 
 
 
