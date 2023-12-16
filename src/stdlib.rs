@@ -109,6 +109,13 @@ impl Stdlib {
         def_one_arg("trim",   vec![Instruction::Trim]);
         def_one_arg("shh",    vec![Instruction::Silence]);
         def_one_arg("bitstr", vec![Instruction::Bitstr]);
+        def_one_arg("is_void",   vec![Instruction::IsVoid]);
+        def_one_arg("is_null",   vec![Instruction::IsNull]);
+        def_one_arg("is_bool",   vec![Instruction::IsBool]);
+        def_one_arg("is_num",    vec![Instruction::IsNum]);
+        def_one_arg("is_str",    vec![Instruction::IsStr]);
+        def_one_arg("is_nan",    vec![Instruction::IsNaN]);
+        def_one_arg("is_int",    vec![Instruction::IsInt]);
         def_one_arg("read_text", vec![Instruction::ReadTextFileSync]);
         def_one_arg("is_even", vec![
             Instruction::PushNum(2.0),

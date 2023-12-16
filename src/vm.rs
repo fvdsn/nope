@@ -733,6 +733,38 @@ impl Vm {
                 Instruction::PushBool(val)  => {
                     self.push(Value::Boolean(val));
                 },
+                Instruction::IsVoid  => {
+                    let v = self.pop();
+                    self.push(Value::Boolean(matches!(v, Value::Void)));
+                },
+                Instruction::IsNull => {
+                    let v = self.pop();
+                    self.push(Value::Boolean(matches!(v, Value::Null)));
+                },
+                Instruction::IsBool => {
+                    let v = self.pop();
+                    self.push(Value::Boolean(matches!(v, Value::Boolean(_))));
+                },
+                Instruction::IsNum => {
+                    let v = self.pop();
+                    self.push(Value::Boolean(matches!(v, Value::Num(_))));
+                },
+                Instruction::IsStr => {
+                    let v = self.pop();
+                    self.push(Value::Boolean(matches!(v, Value::String(_))));
+                },
+                Instruction::IsNaN => {
+                    match self.pop() {
+                        Value::Num(v) => self.push(Value::Boolean(v.is_nan())),
+                        _ => self.push(Value::Boolean(false)),
+                    }
+                },
+                Instruction::IsInt=> {
+                    match self.pop() {
+                        Value::Num(v) => self.push(Value::Boolean(v.fract() == 0.0)),
+                        _ => self.push(Value::Boolean(false)),
+                    }
+                },
                 Instruction::DefineGlobal(cst_idx)  => {
                     let global_name = self.chunk.read_constant_string(cst_idx);
                     let value = self.pop();
