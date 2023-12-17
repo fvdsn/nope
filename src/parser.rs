@@ -1501,7 +1501,8 @@ impl Parser {
             self.push_error(line2, col2, "ERROR: cannot have two expressions on the same line in a block".to_owned());
             return;
         } else if col1 != col2 {
-            self.push_error(line2, col2, "ERROR: must have the same indentation as previous expression in the block".to_owned());
+            self.push_info(line1, col1, "ERROR: next expression must have the same indentation".to_owned());
+            self.push_error(line2, col2, "ERROR: must have the same indentation as the previous expression in the block".to_owned());
             return;
         }
 
@@ -1624,7 +1625,7 @@ impl Parser {
 
                     let op_token_index = self.index;
 
-                    self.parse_expression(ExpressionMode::Single, None);
+                    self.parse_unary(ExpressionMode::Single, None);
                     if self.parsing_failed() {
                         return;
                     }
@@ -1745,6 +1746,7 @@ impl Parser {
                     self.push_error(line, col, "ERROR: cannot have two expressions on the same line".to_owned());
                     return;
                 } else if col != prev_col {
+                    self.push_info(prev_line, prev_col, "ERROR: next expression must have the same indentation".to_owned());
                     self.push_error(line, col, "ERROR: must have the same indentation as previous expression in the block".to_owned());
                     return;
                 }
@@ -3071,6 +3073,19 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_binary_neg_neg() {
+        let mut parser = Parser::new(CONFIG, String::from("-1-2"));
+        parser.parse();
+        assert_eq!(parser.ast, vec![
+              AstNode::Number(1, 1.0),
+              AstNode::UnaryOperator(0, UnaryOperator::Negate, 0),
+              AstNode::Number(3, 2.0),
+              AstNode::BinaryOperator(2, BinaryOperator::Subtract, 1, 2),
+        ]);
+        assert_eq!(parser.state, ParserState::Done);
+    }
+
+    #[test]
     fn test_parse_binary_add_add() {
         let mut parser = Parser::new(CONFIG, String::from("1+1+1"));
         parser.parse();
@@ -3178,9 +3193,9 @@ mod tests {
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.0),
+            AstNode::UnaryOperator(0, UnaryOperator::Negate, 0),
             AstNode::Number(3, 4.0),
-            AstNode::BinaryOperator(2, BinaryOperator::Repeat, 0, 1),
-            AstNode::UnaryOperator(0, UnaryOperator::Negate, 2)
+            AstNode::BinaryOperator(2, BinaryOperator::Repeat, 1, 2)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
@@ -3191,9 +3206,9 @@ mod tests {
         parser.parse();
         assert_eq!(parser.ast, vec![
             AstNode::Number(1, 3.0),
+            AstNode::UnaryOperator(0, UnaryOperator::Negate, 0),
             AstNode::Number(3, 4.0),
-            AstNode::BinaryOperator(2, BinaryOperator::Power, 0, 1),
-            AstNode::UnaryOperator(0, UnaryOperator::Negate, 2)
+            AstNode::BinaryOperator(2, BinaryOperator::Power, 1, 2)
         ]);
         assert_eq!(parser.state, ParserState::Done);
     }
