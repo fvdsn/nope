@@ -32,7 +32,7 @@ fn main() {
         .version("0.1.0")
         .about("The nope interpreter")
         .long_about("
-            interpreter for the nope programming languages. very early stages.
+            interpreter for the nope programming language. very early stages.
         ")
         .author("Frédéric van der Essen")
         .arg(
