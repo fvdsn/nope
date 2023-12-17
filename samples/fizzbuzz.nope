@@ -1,10 +1,19 @@
-iter range [0 100] |i|
-    let div3 eq 0 mod i 3
-    let div5 eq 0 mod i 5
-    ife and div3 div5
-        print "FizzBuzz!!"
-    ife div5
-        print "Buzz"
-    ife div3
-        print "Fizz"
-    print i
+
+# Fizzbuzz
+var i = 1, while i <= 100 (
+    let divby3 = i % 3 == 0
+    let divby5 = i % 5 == 0
+
+    if divby5 && divby3 ( 
+        print 'Fizzbuzz'
+    ) else if divby3 (
+        print 'Fizz'
+    ) else if divby5 (
+        print 'Buzz'
+    ) else (
+        print i
+    )
+
+    set i = i + 1
+)
+
