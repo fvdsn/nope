@@ -1,12 +1,12 @@
 [package]
-name = "nope"
+name = "nope-lang"
 version = "0.1.0"
 edition = "2021"
-description = "The nope interpreter"
+description = "The nope programming language"
 authors = ["Frédéric van der Essen"]
 license = "MIT OR Apache-2.0"
-keywords = ["interpreter"]
-categories = []
+keywords = ["language", "script", "dnd", "math"]
+categories = ["compilers"]
 homepage = "https://github.com/fvdsn/nope"
 repository = "https://github.com/fvdsn/nope"
 readme = "README.md"
