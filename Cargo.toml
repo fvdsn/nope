@@ -12,6 +12,7 @@ repository = "https://github.com/fvdsn/nope"
 readme = "README.md"
 
 [[bin]]
+path = "src/main.rs"
 name = "nope"
 test = true
 bench = false
