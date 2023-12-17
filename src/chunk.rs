@@ -223,6 +223,7 @@ pub enum Instruction {
     Sign,
     Str,
     SubStr,
+    CharAt,
     Len,
     Upper,
     Lower,

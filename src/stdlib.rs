@@ -167,6 +167,7 @@ impl Stdlib {
         def_two_args("write_text", vec![Instruction::WriteTextFileSync]);
         def_two_args("from_unit", vec![Instruction::FromUnit]);
         def_two_args("to_unit", vec![Instruction::ToUnit]);
+        def_two_args("char_at", vec![Instruction::CharAt]);
 
         let three_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },

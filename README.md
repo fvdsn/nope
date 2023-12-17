@@ -300,6 +300,7 @@ And the following arithemtic constants
 - `len` returns the length of the string (scans the whole string)
 - `upper`, `lower` transform the case of the string
 - `trim` removes the whitespace at the beginning and end of the string
+- `char_at(idx, text)` gets the character at string index
 - `substr(from_idx, to_idx, text)`, returns the substring based on character indexes. `to_idx` is not inclusive. Negative indexes start at the end.
 - `replace(from, to, text)` replaces the instances of `from` in `text` to `to`
 - `bitstr` transforms a number to its bitwise representation as a string

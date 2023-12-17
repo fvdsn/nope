@@ -904,6 +904,38 @@ impl Vm {
                         }
                     }
                 },
+                Instruction::CharAt => {
+                    let ostr = self.pop();
+                    let mut idx = self.pop().num_equiv() as i64;
+
+                    match ostr {
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(ref_val);
+                            let strlen = str_val.chars().count() as i64;
+                            if strlen == 0 {
+                                self.push(Value::String(ref_val));
+                            } else {
+                                if idx >= strlen {
+                                    self.push(Value::Void);
+                                } else if idx <= -strlen - 1 {
+                                    self.push(Value::Void);
+                                } else {
+                                    idx = idx.max(-(strlen as i64));
+                                    if idx < 0 {
+                                        idx += strlen
+                                    }
+                                    let c = str_val.chars().nth(idx as usize).unwrap();
+                                    let s = self.intern(c.to_string());
+                                    self.push(Value::String(s));
+                                }
+                            }
+                        },
+                        _ => {
+                            let s = self.intern("".to_owned());
+                            self.push(Value::String(s));
+                        }
+                    }
+                },
                 Instruction::Swap => {
                     let val1 = self.pop();
                     let val2 = self.pop();
