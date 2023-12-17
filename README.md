@@ -19,9 +19,10 @@ Nope is a scripting programming language, optimised for small and fun programs
 
 ## Run and Install
 
-Install rust, clone the repository and then
 
-> cargo install --path .
+Install rust / cargo then
+
+> cargo install nope-lang
 
 You can then launch the interactive repl with
 
