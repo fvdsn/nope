@@ -842,6 +842,68 @@ impl Vm {
                         }
                     }
                 },
+                Instruction::Len => {
+                    let val = self.pop();
+                    match val {
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(ref_val);
+                            self.push(Value::Num(str_val.chars().count() as f64));
+                        }
+                        _ => {
+                            self.push(Value::Num(0.0));
+                        }
+                    }
+                }
+                Instruction::SubStr => {
+                    let ostr = self.pop();
+                    let mut to_idx = self.pop().num_equiv() as i64;
+                    let mut from_idx = self.pop().num_equiv() as i64;
+
+                    match ostr {
+                        Value::String(ref_val) => {
+                            let str_val = self.gc.deref(ref_val);
+                            let strlen = str_val.chars().count();
+                            if strlen == 0 {
+                                self.push(Value::String(ref_val));
+                            } else {
+                                from_idx = from_idx.min(strlen as i64);
+                                from_idx = from_idx.max(-(strlen as i64) - 1);
+                                to_idx = to_idx.min(strlen as i64);
+                                to_idx = to_idx.max(-(strlen as i64) - 1);
+                                if from_idx < 0 {
+                                    from_idx += strlen as i64 + 1;
+                                }
+                                if to_idx < 0 {
+                                    to_idx += strlen as i64 + 1;
+                                }
+
+                                if to_idx < from_idx {
+                                    to_idx = from_idx;
+                                }
+                                if to_idx == from_idx {
+                                    let s = self.intern("".to_owned());
+                                    self.push(Value::String(s));
+                                } else {
+                                    let mut newstrc: Vec<char> = vec![];
+                                    for (idx, c) in str_val.char_indices() {
+                                        if idx as i64 >= to_idx {
+                                            break;
+                                        }
+                                        if idx as i64 >= from_idx {
+                                            newstrc.push(c);
+                                        }
+                                    }
+                                    let s = self.intern(newstrc.iter().collect());
+                                    self.push(Value::String(s));
+                                }
+                            }
+                        },
+                        _ => {
+                            let s = self.intern("".to_owned());
+                            self.push(Value::String(s));
+                        }
+                    }
+                },
                 Instruction::Swap => {
                     let val1 = self.pop();
                     let val2 = self.pop();

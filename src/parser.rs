@@ -1250,8 +1250,6 @@ impl Parser {
                         }
                     };
 
-                    println!("check comma & paren for let");
-
                     self.check_comma_parenthesis_or_newline();
                     if self.parsing_failed() {
                         return;

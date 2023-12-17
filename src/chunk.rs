@@ -222,6 +222,8 @@ pub enum Instruction {
     Trunc,
     Sign,
     Str,
+    SubStr,
+    Len,
     Upper,
     Lower,
     Trim,

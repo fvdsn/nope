@@ -281,7 +281,7 @@ var i = 0, while i < 10 (
 
 ## Types check & conversions
 
-The following functions convert to their type, `num`, `bool`, `str`
+The following functions convert to their type, `to_num`, `to_bool`, `to_str`
 
 The following function test the types: `is_void`, `is_null`, `is_bool`, `is_num`, `is_int`, `is_nan`, `is_odd`, `is_even`, `is_str`
 
@@ -297,9 +297,10 @@ And the following arithemtic constants
 
 ## Strings
 
-- `len` returns the length of the string
+- `len` returns the length of the string (scans the whole string)
 - `upper`, `lower` transform the case of the string
 - `trim` removes the whitespace at the beginning and end of the string
+- `substr(from_idx, to_idx, text)`, returns the substring based on character indexes. `to_idx` is not inclusive. Negative indexes start at the end.
 - `replace(from, to, text)` replaces the instances of `from` in `text` to `to`
 - `bitstr` transforms a number to its bitwise representation as a string
 

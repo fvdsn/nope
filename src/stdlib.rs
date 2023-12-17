@@ -66,13 +66,14 @@ impl Stdlib {
             });
         };
 
-        def_one_arg("num",    vec![Instruction::ParseNum]);
+        def_one_arg("to_num",    vec![Instruction::ParseNum]);
         def_one_arg("print",  vec![Instruction::Print]);
         def_one_arg("echo",   vec![Instruction::Echo]);
+        def_one_arg("len",    vec![Instruction::Len]);
         def_one_arg("neg",    vec![Instruction::Negate]);
         def_one_arg("return", vec![Instruction::Return,]);
         def_one_arg("not",    vec![Instruction::Not]);
-        def_one_arg("bool",   vec![Instruction::Bool]);
+        def_one_arg("to_bool",   vec![Instruction::Bool]);
         def_one_arg("floor",  vec![Instruction::Floor]);
         def_one_arg("ceil",   vec![Instruction::Ceil]);
         def_one_arg("abs",    vec![Instruction::Abs]);
@@ -103,7 +104,7 @@ impl Stdlib {
         def_one_arg("fround", vec![Instruction::Fround]);
         def_one_arg("trunc",  vec![Instruction::Trunc]);
         def_one_arg("sign",   vec![Instruction::Sign]);
-        def_one_arg("str",    vec![Instruction::Str]);
+        def_one_arg("to_str",    vec![Instruction::Str]);
         def_one_arg("upper",  vec![Instruction::Upper]);
         def_one_arg("lower",  vec![Instruction::Lower]);
         def_one_arg("trim",   vec![Instruction::Trim]);
@@ -182,6 +183,7 @@ impl Stdlib {
         };
 
         def_three_args("replace", Instruction::Replace);
+        def_three_args("substr", Instruction::SubStr);
 
         let iterator_args = vec![
             FunctionArg{is_func: false, func_arity:0, name:"array".to_owned()},
