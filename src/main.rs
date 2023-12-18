@@ -29,7 +29,7 @@ use crate::{
 fn main() {
 
     let m = Command::new("nope")
-        .version("0.1.0")
+        .version("0.1.2")
         .about("The nope interpreter")
         .long_about("
             interpreter for the nope programming language. very early stages.

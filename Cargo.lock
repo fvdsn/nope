@@ -274,8 +274,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "nope"
-version = "0.1.0"
+name = "nope-lang"
+version = "0.1.1"
 dependencies = [
  "clap",
  "colored",

@@ -168,6 +168,12 @@ impl Stdlib {
         def_two_args("from_unit", vec![Instruction::FromUnit]);
         def_two_args("to_unit", vec![Instruction::ToUnit]);
         def_two_args("char_at", vec![Instruction::CharAt]);
+        def_two_args("find", vec![Instruction::Find]);
+        def_two_args("contains", vec![
+            Instruction::Find,
+            Instruction::PushNum(0.0),
+            Instruction::GreaterOrEqual,
+        ]);
 
         let three_args_func = vec![
             FunctionArg { name: "a".to_owned(), is_func: false, func_arity: 0 },

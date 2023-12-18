@@ -304,6 +304,8 @@ And the following arithemtic constants
 - `char_at(idx, text)` gets the character at string index
 - `substr(from_idx, to_idx, text)`, returns the substring based on character indexes. `to_idx` is not inclusive. Negative indexes start at the end.
 - `replace(from, to, text)` replaces the instances of `from` in `text` to `to`
+- `find(substr, str)`, returns the position of `substr` in `str` or `-1`
+- `contains(substr, str)` returns `true` if `substr` is a substring of `str`
 - `bitstr` transforms a number to its bitwise representation as a string
 
 ## Randomness

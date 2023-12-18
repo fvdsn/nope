@@ -235,6 +235,7 @@ pub enum Instruction {
     LessOrEqual,
     AlmostEqual,
     Replace,
+    Find,
     FromUnit,
     ToUnit,
     Silence,

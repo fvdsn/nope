@@ -1179,6 +1179,27 @@ impl Vm {
                     let ref_res = self.intern(res);
                     self.push(Value::String(ref_res));
                 },
+                Instruction::Find => {
+                    let text = self.pop();
+                    let val  = self.pop();
+                    match (text, val) {
+                        (Value::String(ref_text), Value::String(ref_val)) => {
+                            let text_str = self.gc.deref(ref_text);
+                            let val_str = self.gc.deref(ref_val);
+                            match text_str.find(val_str) {
+                                Some(num) => {
+                                    self.push(Value::Num(num as f64));
+                                },
+                                None => {
+                                    self.push(Value::Num(-1.0));
+                                },
+                            }
+                        },
+                        (_, _) => {
+                            self.push(Value::Num(-1.0));
+                        }
+                    }
+                },
                 Instruction::Equal => {
                     let ops = (self.pop(), self.pop());
                     match ops {
