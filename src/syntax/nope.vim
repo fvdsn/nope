@@ -17,7 +17,7 @@ syntax keyword repeat while break break_as continue loop
 syntax keyword stdlib random rand100 flip_coin d4 d6 d8 d10 d12 d20 d100
 syntax keyword stdlib to_num print echo neg return not to_bool floor ceil abs acos acosh decr incr sin sinh asin asinh cos cosh tan tanh atan atanh inv log2 log10 ln1p ln exp expm1 sqrt cbrt round fround trunc sign to_str upper lower trim shh bitstr read_text is_even is_odd
 syntax keyword stdlib add sub le leq ge geq eq aeq neq naeq max min mult div pow atan2 modulo join_paths write_text from_unit to_unit
-syntax keyword stdlib replace len substr char_at is_void is_null is_bool is_num is_int is_str
+syntax keyword stdlib replace contains[] len substr char_at find char_at is_void is_null is_bool is_num is_int is_str
 
 syntax match comment "\v#.*$"
 

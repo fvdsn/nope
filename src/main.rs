@@ -15,6 +15,7 @@ mod repl;
 mod gc;
 mod objects;
 mod consts;
+mod vim;
 
 
 use crate::{
@@ -23,13 +24,14 @@ use crate::{
     vm::Vm,
     config::NopeConfig,
     repl::repl,
+    vim::install_vim_plugin,
 };
 
 
 fn main() {
 
     let m = Command::new("nope")
-        .version("0.1.2")
+        .version("0.1.3")
         .about("The nope interpreter")
         .long_about("
             interpreter for the nope programming language. very early stages.
@@ -83,6 +85,13 @@ fn main() {
                 .required(false)
         )
         .arg(
+            Arg::new("install-vim-plugin")
+                .long("install-vim-plugin")
+                .takes_value(false)
+                .help("Sets up vim syntax hilighting for .nope files")
+                .required(false)
+        )
+        .arg(
             Arg::new("filename")
                 .help("The path to the source code")
                 .index(1)
@@ -96,6 +105,11 @@ fn main() {
         trace: m.is_present("trace"),
         echo_result: false,
     };
+
+    if m.is_present("install-vim-plugin") {
+        install_vim_plugin().expect("Couldn't install vim plugin");
+        return;
+    }
 
     if !(m.is_present("eval") || m.is_present("filename")) {
         config.echo_result = true;

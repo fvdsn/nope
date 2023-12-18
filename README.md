@@ -32,6 +32,10 @@ Or run a script with
 
 > nope myscript.nope
 
+If you use vim you can install syntax support with
+
+> nope --install-vim-plugin
+
 
 ## Roadmap
 
