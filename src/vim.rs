@@ -20,6 +20,7 @@ pub fn install_vim_plugin () -> std::io::Result<()> {
         ) || vimrc.contains(
             "autocmd BufNewFile,BufRead *.nope setlocal filetype=nope"
         ) {
+            println!("The vim syntax highlighting plugin has been updated");
             return Ok(());
         }
     }

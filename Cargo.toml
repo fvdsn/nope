@@ -1,6 +1,6 @@
 [package]
 name = "nope-lang"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 description = "The nope programming language"
 authors = ["Frédéric van der Essen"]
