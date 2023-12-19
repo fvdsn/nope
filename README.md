@@ -149,7 +149,7 @@ let score = d6 + d6 + d6
 Note that function application has the highest precedence so `print 1 + 1` prints `1`
 since the addition is performed afterwards. This is not always what you want. One way
 is to use parentheses `print(1 + 1)`, `print (1 + 1)`. Note
-that the space between the function name and the first parentheses is meaningful. Without a 
+that the space between the function name and the first parenthesis is meaningful. Without a 
 space, the full list of arguments is expected, while with the space, it's just parentheses
 around a single argument; `max(1,2)` / `max (1) (2)`
 
