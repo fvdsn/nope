@@ -112,7 +112,7 @@ is defined with `let`, it cannot later be changed with `set`.
 In the second line we declare another variable, but this time it can be modified.
 
 We then evaluate a classic if-else conditional. Note that unlike other languages,
-the code blocks are not defined by curly braces `{`/`}` but by parenthesis `(`/`)`. 
+the code blocks are not defined by curly braces `{`/`}` but by parentheses `(`/`)`. 
 The reason is that nope is an expression based language, so every nope construct is
 an expression that produces a value.
 
@@ -125,15 +125,15 @@ let res = if flip_coin(), "heads" else "tails"
 The `if` returns a value, which depending on the result of `flip_coin()` will be
 either the string "heads" or "tails". 
 
-You can surround expressions with parenthesis and you can also surround multiple
-expressions with parenthesis. In the later case, all expressions are evaluated in
+You can surround expressions with parentheses and you can also surround multiple
+expressions with parentheses. In the later case, all expressions are evaluated in
 order, but only the last expression produces a value.
 
 This is what we've used to both change the variable `winning` with the `set winning = true`
 expression, but also to print a message.
 
-Note as well that the print expression `print "hey"` ommits parenthesis around its argument.
-This is not a special case of the print function. In nope, all parenthesis and commas for
+Note as well that the print expression `print "hey"` ommits parentheses around its argument.
+This is not a special case of the print function. In nope, all parentheses and commas for
 functions, arguments are optional.
 
 ```
@@ -148,9 +148,9 @@ let score = d6 + d6 + d6
 
 Note that function application has the highest precedence so `print 1 + 1` prints `1`
 since the addition is performed afterwards. This is not always what you want. One way
-is to use parenthesis `print(1 + 1)`, `print (1 + 1)`. Note
-that the space between the function name and the first parenthesis is meaningful. Without a 
-space, the full list of arguments is expected, while with the space, it's just parenthesis
+is to use parentheses `print(1 + 1)`, `print (1 + 1)`. Note
+that the space between the function name and the first parentheses is meaningful. Without a 
+space, the full list of arguments is expected, while with the space, it's just parentheses
 around a single argument; `max(1,2)` / `max (1) (2)`
 
 Another way is to use the left arrow `<-` operator. This operator simply evaluates the complete expression
