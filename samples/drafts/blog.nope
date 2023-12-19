@@ -1,0 +1,73 @@
+# Static site generator
+
+let args = args_parse [
+    name: 'blog-gen',
+    version: '1.0.1',
+    options: [
+        outdir: [
+            required: false,
+            default: './generated'
+        ],
+        articles: [
+            required: false,
+            default: './articles/'
+            type: 'existing-path'
+        ]
+    ]
+]
+
+fun list_articles |:| as_list (
+    let files = list_files <- as_path [args.articles './*.md']
+    map files |file| (
+        let filename = path_filename file -> split '.' -> [0]
+        [
+            name: filename
+            contents: read_text file
+        ]
+    )
+)
+
+let STYLE = "body { color: black; background: white }"
+let STYLE_FILE = './style.css'
+
+fun article_path |article| './articles/$[article.name].html'
+
+fun make_page |body| as_str (
+    serialize ~html [~html 
+        [~head [~link rel:'stylesheet' href:STYLE_FILE]]
+        [~body body]
+    ]
+)
+
+fun make_article |article| as_str (
+    article.contents 
+        -> parse ~md
+        -> transform_data [from:~md to:~html]
+        -> make_page
+)
+
+fun make_homepage |articles| as_str (
+    make_page [
+        [~h1 'Articles']
+        [~ul
+            map articles |article| (
+                [~li [~a 
+                    href: article_path article
+                    article.name
+                ]]
+            )
+        ]
+    ]
+)
+
+fun generate |:| as_void (
+    let articles = list_articles()
+    fun outp |path| print as_path [args.outdir, path]
+    write_text outp STYLE_FILE <- STYLE
+    write_text outp './index.html' <- make_homepage articles
+    for article in articles (
+        write_text outp article_path article <- make_article article
+    )
+)
+
+generate()
